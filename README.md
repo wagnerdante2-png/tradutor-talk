@@ -48,13 +48,21 @@ ou:
 tradutor-talk-web
 ~~~
 
-O servidor escuta na porta 8000. O Codespaces deve detectar a porta; abra a URL encaminhada no navegador.
+O servidor escuta na porta 8000. O Codespaces deve detectar a porta e encaminhá-la ao navegador.
 
-A porta deve permanecer privada para este teste.
+Em ambientes onde a autenticação da porta privada do Codespaces retorna HTTP 401, use temporariamente a porta como Pública. O laboratório protege todas as rotas de API com um token aleatório gerado dentro do Codespace; sem esse token não é possível configurar chave, enviar áudio ou consumir STT/TTS. Ao terminar, volte a porta para Privada ou pare o Codespace.
 
-### Passo 3 — liberar o microfone
+### Passo 3 — token e microfone
 
-Na página Tradutor Talk:
+Se estiver usando a porta Pública por causa do HTTP 401, obtenha primeiro o token do laboratório no terminal:
+
+~~~text
+cat /tmp/tradutor-talk-lab-token
+~~~
+
+Cole-o no primeiro painel da página.
+
+Depois, na página Tradutor Talk:
 
 1. permita o microfone quando o Chrome solicitar;
 2. se a OPENAI_API_KEY não estiver configurada no Codespace, cole a chave no painel da página;
