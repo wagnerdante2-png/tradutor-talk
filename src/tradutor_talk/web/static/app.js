@@ -407,9 +407,10 @@ async function startLive(direction, button) {
   setStatus("Preparando Gemini Live", "Gerando token efêmero restrito para " + target + "…", 25);
 
   try {
+    // Resume/create audio output while still inside the user's click gesture.
+    await ensurePlaybackContext();
     const tokenResponse = await requestEphemeralToken(target);
     sessionStartedAt = performance.now();
-    await ensurePlaybackContext();
 
     const url = GEMINI_WS_BASE + "?access_token=" + encodeURIComponent(tokenResponse.token);
     websocket = new WebSocket(url);
