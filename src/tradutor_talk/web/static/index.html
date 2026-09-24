@@ -17,10 +17,24 @@
       <div id="backendBadge" class="badge">Conectando…</div>
     </header>
 
+    <section id="labTokenPanel" class="panel">
+      <div class="panel-head">
+        <div>
+          <p class="eyebrow">ACESSO AO LABORATÓRIO</p>
+          <h2>Token do Codespace</h2>
+        </div>
+      </div>
+      <p class="muted">Copie o token gerado dentro do Codespace. Ele protege todas as rotas de API mesmo quando a porta 8000 está pública.</p>
+      <div class="key-row">
+        <input id="labToken" type="password" autocomplete="off" placeholder="Token do laboratório">
+        <button id="unlockLab" class="secondary">Desbloquear laboratório</button>
+      </div>
+    </section>
+
     <section id="keyPanel" class="panel hidden">
       <div class="panel-head">
         <div>
-          <p class="eyebrow">API</p>
+          <p class="eyebrow">OPENAI API</p>
           <h2>Chave da sessão</h2>
         </div>
       </div>
@@ -52,16 +66,16 @@
     <section class="turn-grid">
       <article class="turn-card remote">
         <p class="eyebrow">REMOTO → LOCAL</p>
-        <h2 id="remoteTitle">Interlocutor fala</h2>
+        <h2>Interlocutor fala</h2>
         <p>Grave a fala do interlocutor. O retorno traduzido tocará neste navegador.</p>
-        <button id="remoteButton" class="turn-button">Iniciar gravação</button>
+        <button id="remoteButton" class="turn-button" disabled>Iniciar gravação</button>
       </article>
 
       <article class="turn-card local">
         <p class="eyebrow">LOCAL → REMOTO</p>
-        <h2 id="localTitle">Você fala</h2>
+        <h2>Você fala</h2>
         <p>Grave sua fala. Neste laboratório, a tradução também toca neste navegador.</p>
-        <button id="localButton" class="turn-button">Iniciar gravação</button>
+        <button id="localButton" class="turn-button" disabled>Iniciar gravação</button>
       </article>
     </section>
 
@@ -69,12 +83,12 @@
       <div class="status-top">
         <div>
           <p class="eyebrow">SESSÃO</p>
-          <h2 id="statusText">Pronto para iniciar</h2>
+          <h2 id="statusText">Informe o token do laboratório</h2>
         </div>
-        <button id="resetButton" class="ghost">Resetar sessão</button>
+        <button id="resetButton" class="ghost" disabled>Resetar sessão</button>
       </div>
       <div class="progress"><div id="progressBar"></div></div>
-      <p id="statusDetail" class="muted">Permita o acesso ao microfone quando o Chrome solicitar.</p>
+      <p id="statusDetail" class="muted">O token fica apenas nesta aba do navegador.</p>
     </section>
 
     <section class="transcript-grid">
@@ -99,7 +113,7 @@
     </section>
 
     <footer>
-      <span>Áudio capturado em memória no navegador e enviado ao Codespace somente ao encerrar o turno.</span>
+      <span>Áudio em memória no navegador; API protegida por token do laboratório.</span>
       <span id="contextInfo">Contexto: 0 turnos</span>
     </footer>
   </main>
