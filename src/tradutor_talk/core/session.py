@@ -26,8 +26,12 @@ class SessionBusyError(RuntimeError):
     pass
 
 
+class PlaybackLifecycleError(RuntimeError):
+    pass
+
+
 class SessionController:
-    """Half-duplex session orchestrator with bounded context and cancellable providers."""
+    """Half-duplex session orchestrator with bounded context and explicit playback lifecycle."""
 
     def __init__(self, *, stt: STTProvider, translator: TranslationProvider, tts: TTSProvider,
                  context: ConversationContext, glossary: Glossary, provider_timeout_seconds: float = 10.0) -> None:
@@ -43,6 +47,8 @@ class SessionController:
         self._lock = asyncio.Lock()
         self._cancel_event = asyncio.Event()
         self._stopping = False
+        self._playback_started_at: float | None = None
+        self._playback_utterance_id: str | None = None
 
     @property
     def state(self) -> SessionState:
@@ -57,6 +63,7 @@ class SessionController:
     def stop(self) -> None:
         self._stopping = True
         self._cancel_event.set()
+        self._clear_playback_tracking()
         self.state_machine.reset(SessionState.IDLE)
 
     def cancel_current(self) -> None:
@@ -74,6 +81,7 @@ class SessionController:
             SessionState.SESSION_ERROR,
         }:
             self._cancel_event.clear()
+            self._clear_playback_tracking()
             self.state_machine.transition(SessionState.LISTENING)
             return
         raise RuntimeError(f"cannot recover while session is {self.state.value}")
@@ -101,6 +109,69 @@ class SessionController:
             cancel_task.cancel()
             if not provider_task.done():
                 provider_task.cancel()
+
+    def begin_playback(self, utterance: Utterance) -> None:
+        """Enter PLAYING only when the caller is actually about to emit synthesized audio."""
+        if self.state is not SessionState.SYNTHESIZING:
+            raise PlaybackLifecycleError(
+                f"cannot begin playback while session is {self.state.value}"
+            )
+        if utterance.status is not UtteranceStatus.SYNTHESIZED:
+            raise PlaybackLifecycleError(
+                f"utterance {utterance.id} is not synthesized"
+            )
+        if self._playback_utterance_id is not None:
+            raise PlaybackLifecycleError("another utterance already owns playback")
+
+        self._playback_utterance_id = utterance.id
+        self._playback_started_at = perf_counter()
+        self.state_machine.transition(SessionState.PLAYING)
+
+    def finish_playback(self, utterance: Utterance) -> None:
+        """Complete the half-duplex turn only after audio output has finished."""
+        self._require_active_playback(utterance)
+        started = self._playback_started_at
+        if started is not None:
+            utterance.stage_latency_ms["playback"] = (perf_counter() - started) * 1000
+
+        self.state_machine.transition(SessionState.COOLDOWN)
+        utterance.status = UtteranceStatus.COMPLETED
+        utterance.finished_at = perf_counter()
+        self._clear_playback_tracking()
+        self.state_machine.transition(SessionState.LISTENING)
+
+    def fail_playback(self, utterance: Utterance) -> None:
+        """Move the session to an explicit error state when output audio fails."""
+        if self.state not in {SessionState.SYNTHESIZING, SessionState.PLAYING}:
+            raise PlaybackLifecycleError(
+                f"cannot fail playback while session is {self.state.value}"
+            )
+        if self._playback_utterance_id not in {None, utterance.id}:
+            raise PlaybackLifecycleError(
+                f"utterance {utterance.id} does not own active playback"
+            )
+
+        started = self._playback_started_at
+        if started is not None:
+            utterance.stage_latency_ms["playback"] = (perf_counter() - started) * 1000
+        utterance.status = UtteranceStatus.FAILED
+        utterance.finished_at = perf_counter()
+        self._clear_playback_tracking()
+        self.state_machine.transition(SessionState.SESSION_ERROR)
+
+    def _require_active_playback(self, utterance: Utterance) -> None:
+        if self.state is not SessionState.PLAYING:
+            raise PlaybackLifecycleError(
+                f"cannot finish playback while session is {self.state.value}"
+            )
+        if self._playback_utterance_id != utterance.id:
+            raise PlaybackLifecycleError(
+                f"utterance {utterance.id} does not own active playback"
+            )
+
+    def _clear_playback_tracking(self) -> None:
+        self._playback_started_at = None
+        self._playback_utterance_id = None
 
     async def process_audio(self, *, audio: bytes, direction: Direction,
                             source_language: str, target_language: str) -> ProcessResult:
@@ -151,11 +222,8 @@ class SessionController:
                     utterance,
                 )
                 utterance.status = UtteranceStatus.SYNTHESIZED
-                self.state_machine.transition(SessionState.PLAYING)
-                self.state_machine.transition(SessionState.COOLDOWN)
-                utterance.status = UtteranceStatus.COMPLETED
-                utterance.finished_at = perf_counter()
-                self.state_machine.transition(SessionState.LISTENING)
+
+                # Keep the gate closed until the caller actually completes playback.
                 return ProcessResult(utterance=utterance, speech=speech)
 
             except OperationCancelled:
