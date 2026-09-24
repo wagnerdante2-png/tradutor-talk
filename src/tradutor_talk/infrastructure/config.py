@@ -41,6 +41,8 @@ class OpenAIProviderConfig:
     stt_model: str = "gpt-transcribe"
     translation_model: str = "gpt-6-luna"
     translation_reasoning_effort: str = "none"
+    tts_model: str = "gpt-4o-mini-tts"
+    tts_voice: str = "marin"
 
 
 @dataclass(slots=True, frozen=True)
