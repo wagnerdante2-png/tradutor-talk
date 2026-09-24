@@ -1,0 +1,14 @@
+{
+  "name": "Tradutor Talk Codespace",
+  "image": "mcr.microsoft.com/devcontainers/python:1-3.12-bookworm",
+  "postCreateCommand": "python -m pip install -e '.[dev,web]'",
+  "postStartCommand": "nohup python -m tradutor_talk.web >/tmp/tradutor-talk-web.log 2>&1 &",
+  "forwardPorts": [8000],
+  "portsAttributes": {
+    "8000": {
+      "label": "Tradutor Talk Web",
+      "onAutoForward": "notify"
+    }
+  },
+  "remoteUser": "vscode"
+}
