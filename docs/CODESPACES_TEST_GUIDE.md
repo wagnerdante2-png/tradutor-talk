@@ -42,6 +42,12 @@ No terminal:
 git pull
 ~~~
 
+Atualize as dependências do Codespace (o laboratório passou a usar o SDK oficial do Google para tokens efêmeros):
+
+~~~text
+python -m pip install -e '.[dev,web]'
+~~~
+
 Depois reinicie o servidor:
 
 ~~~text
@@ -85,7 +91,7 @@ Configure:
 
 ~~~text
 VOCÊ: Português (Brasil)
-INTERLOCUTOR: English (US)
+INTERLOCUTOR: English
 ~~~
 
 ### Interlocutor -> você
@@ -169,3 +175,16 @@ Se o Live Translate funcionar:
 4. testar espanhol, japonês e chinês;
 5. estudar captura de áudio remoto de chamadas;
 6. levar o mesmo provider para o runtime desktop futuro.
+
+
+## Correção do provisionamento de token
+
+A criação do token efêmero usa o SDK oficial `google-genai`, em vez de JSON REST montado manualmente. A API de auth tokens está em preview e o schema wire observado em produção pode divergir dos exemplos REST; o SDK oficial passa a ser o owner da serialização.
+
+Códigos-alvo usados pela interface:
+
+- português do Brasil: `pt-BR`;
+- inglês: `en`;
+- espanhol: `es`;
+- japonês: `ja`;
+- chinês simplificado: `zh-Hans`.
