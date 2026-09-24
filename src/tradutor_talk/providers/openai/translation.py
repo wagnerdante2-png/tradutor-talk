@@ -13,7 +13,7 @@ class OpenAITranslationProvider:
     def __init__(
         self,
         *,
-        model: str = "gpt-6-luna",
+        model: str = "gpt-5.6-luna",
         reasoning_effort: str = "none",
         client=None,
     ) -> None:

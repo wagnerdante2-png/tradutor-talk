@@ -4,39 +4,49 @@ Tradutor Talk é um intérprete bidirecional de conversação em tempo real, ini
 
 ## Estado atual
 
-A fundação M0 está concluída e o caminho técnico de M1–M5 já está implementado para validação física no Windows.
+A fundação M0 está concluída e o caminho técnico de M1–M5 está implementado para validação física no Windows.
 
 ~~~text
-microfone
-   ↓
+áudio
+  ↓
 VAD local / segmentação
-   ↓
+  ↓
 STT
-   ↓
+  ↓
 tradução com contexto + glossário
-   ↓
+  ↓
 TTS
-   ↓
+  ↓
 WAV em memória
-   ↓
-alto-falante / fone
+  ↓
+saída selecionada
 ~~~
 
-Existem dois modos de prova:
-
-1. conversa controlada por Enter;
-2. hands-free half-duplex, com detecção local de início e fim de fala.
-
-Importante: M1–M5 ainda precisam ser validados em hardware real com microfone, saída de áudio e credencial de API. Os adapters possuem testes sem rede, mas este repositório não trata teste mock como prova de dispositivo físico.
-
-## Escopo inicial
+O projeto separa as duas rotas físicas:
 
 ~~~text
-PT-BR ⇄ EN
-áudio → STT → tradução → TTS → áudio
+REMOTO -> entrada remota -> tradução -> saída local -> VOCÊ
+VOCÊ   -> entrada local  -> tradução -> saída remota -> INTERLOCUTOR
 ~~~
 
-A arquitetura separa captura, reconhecimento, tradução e síntese para permitir diagnóstico, fallback e troca de fornecedor sem reconstruir o produto.
+## Teste mais rápido no Windows
+
+Dê duplo clique em:
+
+~~~text
+TESTAR_WINDOWS.bat
+~~~
+
+Ele cria um ambiente virtual local, instala as dependências, roda os testes determinísticos e abre o assistente de teste real.
+
+O assistente oferece:
+
+1. Modo mesa — mesmo microfone e mesmo fone nos dois sentidos, ideal para provar o motor rapidamente;
+2. Modo chamada roteada — microfone local, entrada remota, fone local e saída virtual remota independentes.
+
+A variável OPENAI_API_KEY pode ser informada temporariamente pelo assistente e não é salva pelo Tradutor Talk.
+
+Guia completo: docs/WINDOWS_TEST_GUIDE.md.
 
 ## Princípios
 
@@ -49,6 +59,7 @@ A arquitetura separa captura, reconhecimento, tradução e síntese para permiti
 - métricas por etapa;
 - segredos fora do repositório;
 - VAD local sem consumo de API durante silêncio;
+- half-duplex permanece fechado até o playback terminar;
 - interface de produto somente depois de o núcleo estar estável.
 
 ## Marcos
@@ -58,7 +69,7 @@ A arquitetura separa captura, reconhecimento, tradução e síntese para permiti
 - 🟡 M2 — tradução PT-BR ⇄ EN implementada; validação real pendente.
 - 🟡 M3 — TTS + reprodução WAV implementados; validação real pendente.
 - 🟡 M4 — conversa bidirecional controlada implementada; validação ponta a ponta pendente.
-- 🟡 M5 — VAD local + hands-free alternado implementados; validação em ambiente real pendente.
+- 🟡 M5 — VAD local + hands-free + roteamento direcional implementados; validação em ambiente real pendente.
 - ⏸ M6 — streaming e otimização de latência; aguarda métricas reais do M5.
 - M7 — ES / JA / ZH e autodetecção.
 - M8 — contexto e glossário avançado.
@@ -66,65 +77,66 @@ A arquitetura separa captura, reconhecimento, tradução e síntese para permiti
 - M10 — executável Windows.
 - M11+ — full-duplex, rota realtime direta e clientes futuros.
 
-## Instalação
+## Instalação manual
 
 Requer Python 3.12+.
-
-Teste somente do núcleo:
 
 ~~~bash
 python -m venv .venv
 .venv\Scripts\activate
-pip install -e ".[dev]"
+pip install -e ".[dev,runtime]"
 pytest
-python -m tradutor_talk
 ~~~
 
-Runtime real:
+## Comandos de teste
+
+Listar dispositivos:
 
 ~~~bash
-pip install -e ".[dev,runtime]"
+python -m tradutor_talk.app.device_probe
 ~~~
 
-A variável OPENAI_API_KEY deve existir apenas no ambiente local. Nunca faça commit de uma chave real.
-
-## Provas
-
-Microfone → STT:
+Microfone -> STT:
 
 ~~~bash
 python -m tradutor_talk.app.microphone_probe --seconds 3 --language pt-BR
 ~~~
 
-Conversa bidirecional controlada PT-BR ⇄ EN:
+Conversa bidirecional controlada:
 
 ~~~bash
 python -m tradutor_talk.app.conversation_probe --seconds 4
 ~~~
 
-Hands-free half-duplex:
+Hands-free, uma rodada, dispositivos padrão:
 
 ~~~bash
 python -m tradutor_talk.app.handsfree_probe --rounds 1
 ~~~
 
-Para execução hands-free contínua:
+Assistente Windows:
 
 ~~~bash
-python -m tradutor_talk.app.handsfree_probe
+python -m tradutor_talk.app.windows_test
 ~~~
-
-O áudio capturado e o WAV sintetizado são mantidos em memória pelo aplicativo.
 
 ## Providers atuais
 
 - STT: gpt-transcribe;
-- tradução: gpt-6-luna, reasoning none;
+- tradução: gpt-5.6-luna, reasoning none;
 - TTS: gpt-4o-mini-tts;
 - voz padrão: marin;
 - VAD: WebRTC local, agressividade 2.
 
 Todos são configuráveis em config/default.toml.
+
+## Privacidade
+
+- áudio capturado fica em memória;
+- WAV sintetizado fica em memória;
+- conversa não é salva por padrão;
+- telemetria externa do aplicativo está desligada;
+- a chave da API não deve entrar no repositório.
 
 ## Documentação
 
@@ -134,4 +146,8 @@ Todos são configuráveis em config/default.toml.
 - docs/PROVIDERS.md — contratos de integração;
 - docs/TEST_PLAN.md — estratégia de validação;
 - docs/M1_AUDIO_STT.md — teste físico do primeiro caminho de áudio;
-- docs/M5_VAD_HANDSFREE.md — arquitetura e gate do modo hands-free.
+- docs/M5_VAD_HANDSFREE.md — arquitetura do VAD/hands-free;
+- docs/WINDOWS_TEST_GUIDE.md — teste de mesa e chamada roteada;
+- docs/REFERENCES.md — referências públicas estudadas.
+
+Nenhum workflow de GitHub Actions é necessário para desenvolver, testar ou executar o projeto.

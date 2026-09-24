@@ -48,7 +48,7 @@ def test_translation_adapter_uses_bounded_structured_payload() -> None:
         assert result.target_language == "pt-BR"
 
         kwargs = client.responses.kwargs
-        assert kwargs["model"] == "gpt-6-luna"
+        assert kwargs["model"] == "gpt-5.6-luna"
         assert kwargs["reasoning"] == {"effort": "none"}
         assert kwargs["store"] is False
 
