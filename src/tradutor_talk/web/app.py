@@ -1,7 +1,9 @@
 from __future__ import annotations
 
 import base64
+import hmac
 import os
+import secrets
 from pathlib import Path
 
 from fastapi import FastAPI, HTTPException, Query, Request
@@ -20,10 +22,25 @@ from tradutor_talk.web.session import (
 STATIC_DIR = Path(__file__).with_name("static")
 MAX_AUDIO_BYTES = 12 * 1024 * 1024
 MAX_AUDIO_SECONDS = 30.0
+LAB_TOKEN_PATH = Path("/tmp/tradutor-talk-lab-token")
+
+
+def _load_lab_token() -> str:
+    configured = os.getenv("TRADUTOR_TALK_LAB_TOKEN", "").strip()
+    token = configured or secrets.token_urlsafe(32)
+    try:
+        LAB_TOKEN_PATH.write_text(token, encoding="utf-8")
+        LAB_TOKEN_PATH.chmod(0o600)
+    except OSError:
+        pass
+    return token
+
+
+LAB_TOKEN = _load_lab_token()
 
 app = FastAPI(
     title="Tradutor Talk Codespaces Lab",
-    version="0.3.0",
+    version="0.3.1",
     docs_url=None,
     redoc_url=None,
 )
@@ -40,6 +57,25 @@ class SessionKeyPayload(BaseModel):
     api_key: str
 
 
+def _require_lab_token(request: Request) -> None:
+    supplied = request.headers.get("X-Tradutor-Token", "")
+    if not supplied or not hmac.compare_digest(supplied, LAB_TOKEN):
+        raise HTTPException(status_code=401, detail="invalid laboratory token")
+
+
+@app.on_event("startup")
+async def _announce_lab_token() -> None:
+    print("")
+    print("=" * 72)
+    print("TRADUTOR TALK — CODESPACES LAB")
+    print("=" * 72)
+    print(f"Token do laboratório: {LAB_TOKEN}")
+    print(f"Arquivo do token      : {LAB_TOKEN_PATH}")
+    print("Use a porta pública apenas durante o teste e mantenha este token privado.")
+    print("=" * 72)
+    print("")
+
+
 @app.get("/")
 async def index():
     return FileResponse(
@@ -48,8 +84,18 @@ async def index():
     )
 
 
+@app.get("/api/public-health")
+async def public_health():
+    return {
+        "ok": True,
+        "auth_required": True,
+        "service": "tradutor-talk-codespaces-lab",
+    }
+
+
 @app.get("/api/health")
-async def health():
+async def health(request: Request):
+    _require_lab_token(request)
     return {
         "ok": True,
         "api_key_configured": bool(os.getenv("OPENAI_API_KEY")),
@@ -60,7 +106,9 @@ async def health():
 
 
 @app.post("/api/session-key")
-async def set_session_key(payload: SessionKeyPayload):
+async def set_session_key(payload: SessionKeyPayload, request: Request):
+    _require_lab_token(request)
+
     key = payload.api_key.strip()
     if len(key) < 20:
         raise HTTPException(status_code=400, detail="API key appears invalid")
@@ -77,6 +125,8 @@ async def process_turn(
     source_language: str = Query(..., min_length=2, max_length=16),
     target_language: str = Query(..., min_length=2, max_length=16),
 ):
+    _require_lab_token(request)
+
     if not os.getenv("OPENAI_API_KEY"):
         raise HTTPException(
             status_code=503,
@@ -138,7 +188,8 @@ async def process_turn(
 
 
 @app.post("/api/playback-finished")
-async def playback_finished(payload: PlaybackPayload):
+async def playback_finished(payload: PlaybackPayload, request: Request):
+    _require_lab_token(request)
     try:
         await session.finish_playback(payload.utterance_id)
     except BrowserPlaybackError as exc:
@@ -147,7 +198,8 @@ async def playback_finished(payload: PlaybackPayload):
 
 
 @app.post("/api/playback-failed")
-async def playback_failed(payload: PlaybackPayload):
+async def playback_failed(payload: PlaybackPayload, request: Request):
+    _require_lab_token(request)
     try:
         await session.fail_playback(payload.utterance_id)
     except BrowserPlaybackError as exc:
@@ -156,6 +208,7 @@ async def playback_failed(payload: PlaybackPayload):
 
 
 @app.post("/api/reset")
-async def reset():
+async def reset(request: Request):
+    _require_lab_token(request)
     await session.reset(clear_context=True)
     return {"ok": True, "state": session.state, "context_turns": 0}
