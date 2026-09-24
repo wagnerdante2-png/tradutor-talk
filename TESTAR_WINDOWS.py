@@ -47,6 +47,13 @@ def _ensure_venv() -> None:
         )
 
 
+def _pause() -> None:
+    try:
+        input("\nPressione ENTER para fechar...")
+    except EOFError:
+        pass
+
+
 def main() -> None:
     print("=" * 72)
     print("TRADUTOR TALK — PREPARAÇÃO E TESTE WINDOWS")
@@ -82,6 +89,7 @@ def main() -> None:
 
     print()
     print("Teste encerrado.")
+    _pause()
 
 
 if __name__ == "__main__":
@@ -89,11 +97,15 @@ if __name__ == "__main__":
         main()
     except KeyboardInterrupt:
         print("\nEncerrado pelo usuário.")
+        _pause()
+    except SystemExit as exc:
+        if exc.code not in {None, 0}:
+            print()
+            print(f"ERRO: {exc}")
+            _pause()
+        raise
     except Exception as exc:
         print()
         print(f"ERRO: {type(exc).__name__}: {exc}")
-        try:
-            input("\nPressione ENTER para fechar...")
-        except EOFError:
-            pass
+        _pause()
         raise
