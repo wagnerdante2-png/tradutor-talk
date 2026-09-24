@@ -12,6 +12,9 @@ dependencies = []
 
 [project.optional-dependencies]
 dev = ["pytest>=8.0"]
+audio = ["sounddevice>=0.5"]
+openai = ["openai>=1.50"]
+runtime = ["sounddevice>=0.5", "openai>=1.50"]
 
 [tool.setuptools.packages.find]
 where = ["src"]
