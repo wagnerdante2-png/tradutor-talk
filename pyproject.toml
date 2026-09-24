@@ -13,8 +13,13 @@ dependencies = []
 [project.optional-dependencies]
 dev = ["pytest>=8,<10"]
 audio = ["sounddevice>=0.5,<1"]
+vad = ["webrtcvad-wheels==2.0.14"]
 openai = ["openai>=3.17,<4"]
-runtime = ["sounddevice>=0.5,<1", "openai>=3.17,<4"]
+runtime = [
+    "sounddevice>=0.5,<1",
+    "webrtcvad-wheels==2.0.14",
+    "openai>=3.17,<4",
+]
 
 [tool.setuptools.packages.find]
 where = ["src"]
