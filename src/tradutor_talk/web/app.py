@@ -2,14 +2,11 @@ from __future__ import annotations
 
 import asyncio
 import hmac
-import json
 import os
 import re
 import secrets
 from datetime import datetime, timedelta, timezone
 from pathlib import Path
-from urllib.error import HTTPError, URLError
-from urllib.request import Request, urlopen
 
 from fastapi import FastAPI, HTTPException, Query, Request as FastAPIRequest
 from fastapi.responses import FileResponse
@@ -18,9 +15,9 @@ from pydantic import BaseModel
 
 STATIC_DIR = Path(__file__).with_name("static")
 LAB_TOKEN_PATH = Path("/tmp/tradutor-talk-lab-token")
-GEMINI_AUTH_TOKEN_URL = "https://generativelanguage.googleapis.com/v1beta/auth_tokens"
 GEMINI_LIVE_TRANSLATE_MODEL = "gemini-3.5-live-translate-preview"
 LANGUAGE_CODE_RE = re.compile(r"^[A-Za-z]{2,3}(?:-[A-Za-z0-9]{2,8})*$")
+SUPPORTED_TARGET_LANGUAGES = {"pt-BR", "en", "es", "ja", "zh-Hans"}
 
 
 def _load_lab_token() -> str:
@@ -49,7 +46,7 @@ LAB_TOKEN = _load_lab_token()
 
 app = FastAPI(
     title="Tradutor Talk Codespaces Lab",
-    version="0.4.0",
+    version="0.4.1",
     docs_url=None,
     redoc_url=None,
 )
@@ -73,71 +70,74 @@ def _gemini_api_key() -> str:
     )
 
 
+def _read_attr(value, *names):
+    for name in names:
+        if hasattr(value, name):
+            return getattr(value, name)
+    return None
+
+
 def _create_live_token_sync(api_key: str, target_language_code: str) -> dict:
+    """Create the ephemeral Live token through Google's official SDK.
+
+    The auth-token API is preview and its wire schema has changed. Delegating
+    serialization to google-genai keeps this adapter aligned with the current
+    API contract instead of hand-crafting preview JSON.
+    """
+    try:
+        from google import genai
+    except ImportError as exc:
+        raise RuntimeError(
+            "google-genai is not installed in this Codespace. "
+            "Run: python -m pip install -e '.[dev,web]'"
+        ) from exc
+
     now = datetime.now(timezone.utc)
-    body = {
-        "uses": 1,
-        "expireTime": (now + timedelta(minutes=30)).isoformat().replace("+00:00", "Z"),
-        "newSessionExpireTime": (now + timedelta(minutes=1)).isoformat().replace("+00:00", "Z"),
-        "liveConnectConstraints": {
-            "model": f"models/{GEMINI_LIVE_TRANSLATE_MODEL}",
-            "config": {
-                "responseModalities": ["AUDIO"],
-                "inputAudioTranscription": {},
-                "outputAudioTranscription": {},
-                "translationConfig": {
-                    "targetLanguageCode": target_language_code,
-                    "echoTargetLanguage": True,
+    client = genai.Client(api_key=api_key)
+
+    try:
+        token = client.auth_tokens.create(
+            config={
+                "uses": 1,
+                "expire_time": now + timedelta(minutes=30),
+                "new_session_expire_time": now + timedelta(minutes=1),
+                "live_connect_constraints": {
+                    "model": GEMINI_LIVE_TRANSLATE_MODEL,
+                    "config": {
+                        "translation_config": {
+                            "target_language_code": target_language_code,
+                            "echo_target_language": True,
+                        }
+                    },
                 },
-            },
-        },
-    }
-    payload = json.dumps(body).encode("utf-8")
-    request = Request(
-        GEMINI_AUTH_TOKEN_URL,
-        data=payload,
-        method="POST",
-        headers={
-            "Content-Type": "application/json",
-            "Content-Length": str(len(payload)),
-            "x-goog-api-key": api_key,
-        },
+            }
+        )
+    except Exception as exc:
+        raise RuntimeError(
+            f"Gemini token provisioning failed: {type(exc).__name__}: {exc}"
+        ) from exc
+
+    token_name = str(_read_attr(token, "name") or "").strip()
+    if not token_name:
+        raise RuntimeError("Gemini SDK did not return an ephemeral token name")
+
+    expire_time = _read_attr(token, "expire_time", "expireTime")
+    new_session_expire_time = _read_attr(
+        token,
+        "new_session_expire_time",
+        "newSessionExpireTime",
     )
 
-    try:
-        with urlopen(request, timeout=15) as response:
-            raw = response.read(512_000)
-    except HTTPError as exc:
-        raw = exc.read(64_000)
-        message = f"Gemini HTTP {exc.code}"
-        try:
-            parsed = json.loads(raw.decode("utf-8", errors="replace"))
-            api_message = (
-                parsed.get("error", {}).get("message")
-                if isinstance(parsed, dict)
-                else None
-            )
-            if api_message:
-                message += f": {api_message}"
-        except Exception:
-            pass
-        raise RuntimeError(message) from exc
-    except URLError as exc:
-        raise RuntimeError(f"Gemini connection failed: {exc.reason}") from exc
-
-    try:
-        parsed = json.loads(raw.decode("utf-8"))
-    except json.JSONDecodeError as exc:
-        raise RuntimeError("Gemini returned an invalid auth-token response") from exc
-
-    token = str(parsed.get("name", "")).strip()
-    if not token:
-        raise RuntimeError("Gemini did not return an ephemeral token")
-
     return {
-        "token": token,
-        "expire_time": parsed.get("expireTime"),
-        "new_session_expire_time": parsed.get("newSessionExpireTime"),
+        "token": token_name,
+        "expire_time": (
+            expire_time.isoformat() if hasattr(expire_time, "isoformat") else expire_time
+        ),
+        "new_session_expire_time": (
+            new_session_expire_time.isoformat()
+            if hasattr(new_session_expire_time, "isoformat")
+            else new_session_expire_time
+        ),
     }
 
 
@@ -211,6 +211,11 @@ async def create_gemini_live_token(
 
     if not LANGUAGE_CODE_RE.fullmatch(target_language_code):
         raise HTTPException(status_code=400, detail="invalid target language code")
+    if target_language_code not in SUPPORTED_TARGET_LANGUAGES:
+        raise HTTPException(
+            status_code=400,
+            detail=f"unsupported target language code: {target_language_code}",
+        )
 
     api_key = _gemini_api_key()
     if not api_key:
