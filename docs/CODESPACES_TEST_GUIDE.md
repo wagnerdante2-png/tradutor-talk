@@ -50,9 +50,11 @@ python -m pip install -e '.[dev,web]'
 
 A instalação acontece dentro do ambiente Linux remoto.
 
-## 2. Iniciar o servidor
+## 2. Servidor
 
-No terminal do Codespace:
+O devcontainer inicia o laboratório automaticamente quando o Codespace sobe.
+
+Se a porta 8000 não aparecer ou se você reiniciar o servidor manualmente, use:
 
 ~~~text
 python -m tradutor_talk.web
@@ -64,7 +66,11 @@ Alternativa:
 tradutor-talk-web
 ~~~
 
-Saída esperada inclui o servidor na porta 8000.
+O log da inicialização automática fica em:
+
+~~~text
+/tmp/tradutor-talk-web.log
+~~~
 
 ## 3. Abrir a porta
 
