@@ -6,3 +6,12 @@ max_turns = 8
 
 [glossary]
 path = "config/glossary.example.json"
+
+[audio]
+sample_rate = 16000
+channels = 1
+block_ms = 20
+dtype = "int16"
+
+[providers.openai]
+stt_model = "gpt-transcribe"
