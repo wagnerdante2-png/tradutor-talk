@@ -25,7 +25,18 @@ LANGUAGE_CODE_RE = re.compile(r"^[A-Za-z]{2,3}(?:-[A-Za-z0-9]{2,8})*$")
 
 def _load_lab_token() -> str:
     configured = os.getenv("TRADUTOR_TALK_LAB_TOKEN", "").strip()
-    token = configured or secrets.token_urlsafe(32)
+    if configured:
+        token = configured
+    else:
+        token = ""
+        try:
+            if LAB_TOKEN_PATH.exists():
+                token = LAB_TOKEN_PATH.read_text(encoding="utf-8").strip()
+        except OSError:
+            token = ""
+        if not token:
+            token = secrets.token_urlsafe(32)
+
     try:
         LAB_TOKEN_PATH.write_text(token, encoding="utf-8")
         LAB_TOKEN_PATH.chmod(0o600)
