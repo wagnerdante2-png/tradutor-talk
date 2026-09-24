@@ -7,6 +7,8 @@ import re
 import secrets
 from datetime import datetime, timedelta, timezone
 from pathlib import Path
+from urllib.error import HTTPError, URLError
+from urllib.request import Request, urlopen
 
 from fastapi import FastAPI, HTTPException, Query, Request as FastAPIRequest
 from fastapi.responses import FileResponse
@@ -68,6 +70,34 @@ def _gemini_api_key() -> str:
         os.getenv("GEMINI_API_KEY", "").strip()
         or os.getenv("GOOGLE_API_KEY", "").strip()
     )
+
+
+def _validate_gemini_key_sync(api_key: str) -> None:
+    request = Request(
+        "https://generativelanguage.googleapis.com/v1beta/models?pageSize=1",
+        method="GET",
+        headers={"x-goog-api-key": api_key},
+    )
+    try:
+        with urlopen(request, timeout=15) as response:
+            response.read(4096)
+    except HTTPError as exc:
+        raw = exc.read(64_000).decode("utf-8", errors="replace")
+        if exc.code in {400, 401, 403} and (
+            "API_KEY_INVALID" in raw
+            or "API key not valid" in raw
+            or "API_KEY_SERVICE_BLOCKED" in raw
+        ):
+            raise RuntimeError(
+                "Esta chave Gemini foi rejeitada pela API atual. "
+                "Se ela veio de uma integração antiga, crie uma nova auth key "
+                "no Google AI Studio e tente novamente."
+            ) from exc
+        raise RuntimeError(f"Gemini key validation failed with HTTP {exc.code}") from exc
+    except URLError as exc:
+        raise RuntimeError(
+            f"Não foi possível validar a chave Gemini: {exc.reason}"
+        ) from exc
 
 
 def _read_attr(value, *names):
@@ -197,9 +227,18 @@ async def set_gemini_key(payload: GeminiKeyPayload, request: FastAPIRequest):
     if len(key) < 20:
         raise HTTPException(status_code=400, detail="Gemini API key appears invalid")
 
+    try:
+        await asyncio.to_thread(_validate_gemini_key_sync, key)
+    except RuntimeError as exc:
+        raise HTTPException(status_code=400, detail=str(exc)) from exc
+
     os.environ["GEMINI_API_KEY"] = key
     os.environ.pop("GOOGLE_API_KEY", None)
-    return {"ok": True, "gemini_key_configured": True}
+    return {
+        "ok": True,
+        "gemini_key_configured": True,
+        "validated": True,
+    }
 
 
 @app.post("/api/gemini-live-token")
