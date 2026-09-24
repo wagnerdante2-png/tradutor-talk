@@ -15,3 +15,5 @@ dtype = "int16"
 
 [providers.openai]
 stt_model = "gpt-transcribe"
+translation_model = "gpt-6-luna"
+translation_reasoning_effort = "none"
