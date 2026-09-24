@@ -1,14 +1,28 @@
 # Tradutor Talk
 
-Tradutor Talk é um projeto de intérprete bidirecional de conversação em tempo real, inicialmente para Windows, com foco em robustez, baixa latência e arquitetura substituível por provedores.
+Tradutor Talk é um intérprete bidirecional de conversação em tempo real, inicialmente para Windows, com foco em robustez, baixa latência, privacidade e arquitetura substituível por provedores.
 
 ## Estado atual
 
-**M0 — fundação arquitetural implementada.**
+A fundação **M0** está concluída e o caminho técnico de **M1–M4** já está implementado para validação física no Windows.
 
-Já existem máquina de estados, orquestrador de sessão half-duplex, contratos de providers, mocks determinísticos, contexto limitado, glossário, ring buffer, configuração, métricas de latência e testes unitários.
+```text
+microfone
+   ↓
+STT
+   ↓
+tradução com contexto + glossário
+   ↓
+TTS
+   ↓
+WAV em memória
+   ↓
+alto-falante / fone
+```
 
-O próximo marco é **M1: áudio real do Windows → captura controlada → STT**.
+O modo de conversa atual é controlado por turnos: o interlocutor fala, o sistema traduz e reproduz; depois o usuário fala e o fluxo acontece no sentido inverso. VAD/hands-free e streaming contínuo entram nos marcos seguintes.
+
+**Importante:** M1–M4 ainda precisam ser validados em hardware real com microfone, saída de áudio e credencial de API. Os adapters possuem testes sem rede, mas este repositório não trata teste mock como prova de dispositivo físico.
 
 ## Escopo inicial
 
@@ -26,32 +40,31 @@ A arquitetura separa captura, reconhecimento, tradução e síntese para permiti
 - providers substituíveis;
 - timeout e cancelamento centralizados;
 - contexto de conversa limitado;
-- testes com mocks antes de APIs reais;
+- testes com mocks/fakes antes de APIs reais;
 - métricas por etapa;
+- segredos fora do repositório;
 - interface de produto somente depois de o núcleo estar estável.
 
 ## Marcos
 
-- ✅ **M0** — fundação, máquina de estados, modelos, mocks e testes.
-- ⏭ **M1** — captura de microfone e STT.
-- **M2** — tradução PT-BR ⇄ EN.
-- **M3** — TTS e reprodução.
-- **M4** — conversa bidirecional utilizável.
-- **M5** — VAD e hands-free.
+- ✅ **M0** — fundação, máquina de estados, modelos, mocks e resiliência.
+- 🟡 **M1** — captura de microfone + STT implementados; validação física pendente.
+- 🟡 **M2** — tradução PT-BR ⇄ EN implementada; validação real pendente.
+- 🟡 **M3** — TTS + reprodução WAV implementados; validação real pendente.
+- 🟡 **M4** — conversa bidirecional controlada implementada; validação ponta a ponta pendente.
+- ⏭ **M5** — VAD e hands-free.
 - **M6** — streaming e otimização de latência.
 - **M7** — ES / JA / ZH e autodetecção.
 - **M8** — contexto e glossário avançado.
 - **M9** — recuperação e testes de falha.
 - **M10** — executável Windows.
-- **M11+** — full-duplex, realtime direto e clientes futuros.
+- **M11+** — full-duplex, rota realtime direta e clientes futuros.
 
-## Regras do MVP
-
-O MVP não inclui login, banco de dados, painel administrativo, mobile, clonagem de voz, AR ou armazenamento em nuvem. Primeiro validaremos o ciclo completo de conversação.
-
-## Execução local
+## Instalação
 
 Requer Python 3.12+.
+
+Teste somente do núcleo:
 
 ```bash
 python -m venv .venv
@@ -61,7 +74,38 @@ pytest
 python -m tradutor_talk
 ```
 
-O último comando executa uma demonstração determinística usando providers mock, sem API e sem consumo externo.
+Runtime real:
+
+```bash
+pip install -e ".[dev,runtime]"
+```
+
+A variável `OPENAI_API_KEY` deve existir apenas no ambiente local. Nunca faça commit de uma chave real.
+
+## Provas controladas
+
+Microfone → STT:
+
+```bash
+python -m tradutor_talk.app.microphone_probe --seconds 3 --language pt-BR
+```
+
+Conversa bidirecional PT-BR ⇄ EN:
+
+```bash
+python -m tradutor_talk.app.conversation_probe --seconds 4
+```
+
+O áudio capturado e o WAV sintetizado são mantidos em memória pelo aplicativo.
+
+## Providers atuais
+
+- STT: `gpt-transcribe`;
+- tradução: `gpt-6-luna`, reasoning `none`;
+- TTS: `gpt-4o-mini-tts`;
+- voz padrão: `marin`.
+
+Todos são configuráveis em `config/default.toml`.
 
 ## Documentação
 
@@ -69,4 +113,5 @@ O último comando executa uma demonstração determinística usando providers mo
 - `docs/ARCHITECTURE.md` — decisões e fronteiras;
 - `docs/STATES.md` — máquina de estados;
 - `docs/PROVIDERS.md` — contratos de integração;
-- `docs/TEST_PLAN.md` — estratégia de validação.
+- `docs/TEST_PLAN.md` — estratégia de validação;
+- `docs/M1_AUDIO_STT.md` — teste físico do primeiro caminho de áudio.
