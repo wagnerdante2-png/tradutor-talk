@@ -1,197 +1,171 @@
-# Codespaces Lab — teste sem instalação local
+# Codespaces Lab — Gemini Live Translate
 
 ## Objetivo
 
-Executar o núcleo do Tradutor Talk dentro de um GitHub Codespace e usar somente o navegador do notebook como dispositivo de entrada/saída.
-
-Nada do runtime Python precisa ser instalado no notebook corporativo.
+Testar tradução voz→voz quase em tempo real sem instalar Python, drivers ou bibliotecas no notebook corporativo.
 
 ## Arquitetura
 
 ~~~text
-NOTEBOOK
+NOTEBOOK CORPORATIVO
 Chrome
   | microfone
+  | PCM 16 kHz / ~100 ms
   v
-HTTPS / porta privada do Codespace
-  |
+Gemini Live Translate
+  | áudio traduzido PCM 24 kHz
   v
+Chrome / fone
+
 CODESPACE
-SessionController
-  -> gpt-transcribe
-  -> gpt-5.6-luna
-  -> gpt-4o-mini-tts
-  |
-  v
-HTTPS
-  |
-  v
-Chrome
-  -> fone/alto-falante
+  usado apenas para:
+  - servir a interface
+  - guardar GEMINI_API_KEY
+  - emitir token efêmero Gemini
 ~~~
 
-O modo web é um adaptador de I/O. O core e os providers usados pelo desktop permanecem os mesmos.
+O áudio ao vivo não precisa atravessar o backend do Codespace.
 
-## 1. Criar o Codespace
-
-No repositório:
+## Modelo
 
 ~~~text
-Code
--> Codespaces
--> Create codespace on main
+gemini-3.5-live-translate-preview
 ~~~
 
-O devcontainer fixa Python 3.12 e executa automaticamente:
+O modelo faz tradução speech-to-speech de baixa latência e também fornece transcrição do áudio de entrada e da tradução.
+
+## 1. Atualizar o Codespace
+
+No terminal:
 
 ~~~text
-python -m pip install -e '.[dev,web]'
+git pull
 ~~~
 
-A instalação acontece dentro do ambiente Linux remoto.
-
-## 2. Servidor
-
-O devcontainer inicia o laboratório automaticamente quando o Codespace sobe.
-
-Se a porta 8000 não aparecer ou se você reiniciar o servidor manualmente, use:
+Depois reinicie o servidor:
 
 ~~~text
-python -m tradutor_talk.web
+pkill -f "tradutor_talk.web"
+nohup python -m tradutor_talk.web >/tmp/tradutor-talk-web.log 2>&1 &
 ~~~
 
-Alternativa:
+## 2. Porta 8000
 
-~~~text
-tradutor-talk-web
-~~~
+Se a porta privada funcionar, mantenha Private.
 
-O log da inicialização automática fica em:
+Se este navegador corporativo retornar HTTP 401 na porta privada:
 
-~~~text
-/tmp/tradutor-talk-web.log
-~~~
+- mude temporariamente a porta 8000 para Public;
+- use o token do laboratório;
+- ao terminar, volte a porta para Private ou pare o Codespace.
 
-## 3. Abrir a porta
-
-O Codespaces deve detectar a porta 8000 automaticamente.
-
-Na guia PORTS/PORTAS:
-
-- porta: 8000;
-- altere temporariamente a visibilidade para Public/Pública;
-- abra no navegador.
-
-Motivo: neste notebook o proxy de autenticação da porta privada está retornando HTTP 401. O laboratório agora possui uma segunda camada própria de proteção: todas as rotas de API exigem um token aleatório de alta entropia gerado dentro do Codespace.
-
-A página HTML pode ser carregada publicamente, mas sem o token ninguém consegue configurar a OPENAI_API_KEY, enviar áudio, usar STT/TTS, resetar a sessão ou consumir sua cota.
-
-Ao terminar o teste, volte a porta para Private/Privada ou pare o Codespace.
-
-## 4. Token do laboratório
-
-No terminal do Codespace:
+## 3. Token do laboratório
 
 ~~~text
 cat /tmp/tradutor-talk-lab-token
 ~~~
 
-Copie o valor exibido e cole no primeiro painel da página.
+Cole o valor no primeiro painel da página.
 
-O token também aparece no log de inicialização:
+Este token protege os endpoints do backend.
 
-~~~text
-cat /tmp/tradutor-talk-web.log
-~~~
+## 4. Gemini API key
 
-O navegador mantém o token apenas em sessionStorage da aba atual.
+Use a GEMINI_API_KEY já utilizada no Ultimecia, caso ainda esteja válida.
 
-## 5. API key
+Ela é diferente do token do laboratório.
 
-Há duas formas.
+A chave é mantida somente em memória no Codespace e é usada para solicitar um token efêmero restrito ao Live Translate.
 
-### Opção A — somente nesta página/sessão
+Se a chave antiga do Ultimecia for uma chave padrão legada e for rejeitada, crie/migre uma chave atual no Google AI Studio. Em 2026 a API Gemini migrou novas chaves para auth keys e passou a descontinuar chaves padrão.
 
-Se o backend não encontrar OPENAI_API_KEY, a interface exibe um campo de chave.
+## 5. Primeiro teste
 
-A chave é enviada ao backend do Codespace e colocada apenas na memória do processo atual. O Tradutor Talk não grava a chave em arquivo.
-
-### Opção B — terminal/Codespaces secret
-
-Configure OPENAI_API_KEY no ambiente do Codespace antes de iniciar o servidor.
-
-Nesse caso o campo não aparece.
-
-## 6. Primeiro teste
-
-Mantenha:
+Configure:
 
 ~~~text
-Você: Português (Brasil)
-Interlocutor: English (US)
+VOCÊ: Português (Brasil)
+INTERLOCUTOR: English (US)
 ~~~
 
-Fluxo:
+### Interlocutor -> você
 
-1. clique em Interlocutor fala;
-2. permita o microfone no Chrome;
-3. fale uma frase em inglês;
-4. clique em Parar e traduzir;
-5. aguarde a tradução em português;
-6. escute o WAV retornado;
-7. clique em Você fala;
-8. fale em português;
-9. pare;
-10. escute o inglês.
+1. clique em Iniciar tradução ao vivo no cartão Interlocutor fala;
+2. permita o microfone;
+3. fale em inglês;
+4. o texto original deve aparecer incrementalmente;
+5. a tradução em português deve aparecer;
+6. o áudio em português deve começar a tocar enquanto a fala ainda está em andamento;
+7. clique em Parar sessão quando terminar.
 
-## Estados
+### Você -> interlocutor
 
-O navegador não ignora a máquina de estados existente.
+1. clique no cartão Você fala;
+2. fale em português;
+3. o alvo será English (US);
+4. a voz traduzida em inglês será reproduzida neste laboratório.
 
-Quando o backend termina o TTS:
+Neste estágio ambos os fluxos usam o mesmo microfone e fone do navegador. A injeção direta em Meet/Teams/WhatsApp continua sendo uma etapa posterior do desktop/roteamento virtual.
+
+## 6. Métricas
+
+A interface mostra:
+
+- Conexão: tempo até o WebSocket Live ficar pronto;
+- 1º áudio: tempo até chegar o primeiro chunk de voz traduzida;
+- Direção;
+- modelo;
+- transcrição original;
+- transcrição traduzida.
+
+## 7. Formatos
+
+Entrada:
 
 ~~~text
-SYNTHESIZING -> PLAYING
+PCM bruto
+16-bit little-endian
+mono
+16 kHz
+blocos ~100 ms
 ~~~
 
-Ele só retorna para:
+Saída:
 
 ~~~text
-LISTENING
+PCM bruto
+16-bit little-endian
+mono
+24 kHz
+streaming
 ~~~
 
-quando o navegador informa que a reprodução acabou.
+## 8. Segurança
 
-Se o Chrome bloquear autoplay, use o controle de áudio manualmente. O turno é fechado quando o evento ended ocorrer.
+A GEMINI_API_KEY não é enviada ao navegador.
 
-## Métricas exibidas
+O Codespace solicita um token efêmero:
 
-- STT ms;
-- tradução ms;
-- TTS ms;
-- processamento total;
-- texto original;
-- texto traduzido;
-- número de turnos mantidos em contexto.
+- uso único para abertura da sessão;
+- expiração curta;
+- restrito ao modelo Live Translate;
+- restrito ao idioma-alvo solicitado.
 
-## Limites do laboratório V0
+O Chrome usa esse token no endpoint WebSocket constrained da API Live.
 
-- início/fim do turno é manual;
-- apenas PT-BR ⇄ EN está no gate principal;
-- áudio remoto de Teams/Meet/WhatsApp ainda não é capturado diretamente;
-- a saída traduzida ainda não é injetada como microfone virtual;
-- streaming contínuo ainda não está ativo.
+## 9. Free tier
 
-Esses pontos são deliberados. O objetivo do laboratório é validar primeiro o ciclo real browser -> Codespace -> OpenAI -> browser.
+O Gemini Developer API oferece free tier para determinados modelos. O Live Translate está listado com entrada e saída gratuitas dentro dos limites do nível gratuito.
 
-## Próximo passo após o primeiro teste
+O nível gratuito possui rate limits e o conteúdo pode ser usado pelo Google para melhorar produtos, conforme a política atual do free tier.
 
-Com as latências reais registradas, decidir:
+## 10. Próximas etapas depois do teste
 
-1. VAD no browser;
-2. streaming de transcrição;
-3. TTS em streaming;
-4. rota speech-to-speech/realtime;
-5. integração com áudio remoto de chamadas.
+Se o Live Translate funcionar:
 
-A arquitetura desktop permanece disponível para o futuro equipamento próprio.
+1. medir latência real;
+2. estabilizar captura/reprodução;
+3. adicionar VAD/automação de direção;
+4. testar espanhol, japonês e chinês;
+5. estudar captura de áudio remoto de chamadas;
+6. levar o mesmo provider para o runtime desktop futuro.
