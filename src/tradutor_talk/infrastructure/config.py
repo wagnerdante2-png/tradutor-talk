@@ -39,6 +39,8 @@ class AudioConfig:
 @dataclass(slots=True, frozen=True)
 class OpenAIProviderConfig:
     stt_model: str = "gpt-transcribe"
+    translation_model: str = "gpt-6-luna"
+    translation_reasoning_effort: str = "none"
 
 
 @dataclass(slots=True, frozen=True)
