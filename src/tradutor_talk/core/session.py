@@ -22,11 +22,17 @@ class ProviderTimeoutError(TimeoutError):
     pass
 
 
+class SessionBusyError(RuntimeError):
+    pass
+
+
 class SessionController:
     """Half-duplex session orchestrator with bounded context and cancellable providers."""
 
     def __init__(self, *, stt: STTProvider, translator: TranslationProvider, tts: TTSProvider,
                  context: ConversationContext, glossary: Glossary, provider_timeout_seconds: float = 10.0) -> None:
+        if provider_timeout_seconds <= 0:
+            raise ValueError("provider_timeout_seconds must be > 0")
         self.stt = stt
         self.translator = translator
         self.tts = tts
@@ -36,6 +42,7 @@ class SessionController:
         self.state_machine = SessionStateMachine()
         self._lock = asyncio.Lock()
         self._cancel_event = asyncio.Event()
+        self._stopping = False
 
     @property
     def state(self) -> SessionState:
@@ -43,14 +50,33 @@ class SessionController:
 
     def start(self) -> None:
         if self.state is SessionState.IDLE:
+            self._stopping = False
+            self._cancel_event.clear()
             self.state_machine.transition(SessionState.LISTENING)
 
     def stop(self) -> None:
+        self._stopping = True
         self._cancel_event.set()
         self.state_machine.reset(SessionState.IDLE)
 
     def cancel_current(self) -> None:
-        self._cancel_event.set()
+        if not self._stopping:
+            self._cancel_event.set()
+
+    def recover(self) -> None:
+        if self.state is SessionState.LISTENING:
+            return
+        if self.state in {
+            SessionState.RECOVERING_NETWORK,
+            SessionState.PROVIDER_UNAVAILABLE,
+            SessionState.AUDIO_DEVICE_LOST,
+            SessionState.RATE_LIMITED,
+            SessionState.SESSION_ERROR,
+        }:
+            self._cancel_event.clear()
+            self.state_machine.transition(SessionState.LISTENING)
+            return
+        raise RuntimeError(f"cannot recover while session is {self.state.value}")
 
     async def _stage(self, name: str, awaitable: Awaitable[T], utterance: Utterance) -> T:
         started = perf_counter()
@@ -80,8 +106,8 @@ class SessionController:
                             source_language: str, target_language: str) -> ProcessResult:
         if not audio:
             raise ValueError("audio cannot be empty")
-        if self.state is SessionState.IDLE:
-            raise RuntimeError("session must be started before processing audio")
+        if self._lock.locked() or self.state is not SessionState.LISTENING:
+            raise SessionBusyError(f"session is not ready: {self.state.value}")
 
         async with self._lock:
             self._cancel_event.clear()
@@ -135,10 +161,11 @@ class SessionController:
             except OperationCancelled:
                 utterance.status = UtteranceStatus.CANCELLED
                 utterance.finished_at = perf_counter()
-                self.state_machine.reset(SessionState.LISTENING)
+                self.state_machine.reset(SessionState.IDLE if self._stopping else SessionState.LISTENING)
                 raise
             except Exception:
                 utterance.status = UtteranceStatus.FAILED
                 utterance.finished_at = perf_counter()
-                self.state_machine.transition(SessionState.SESSION_ERROR)
+                if self.state is not SessionState.IDLE:
+                    self.state_machine.transition(SessionState.SESSION_ERROR)
                 raise
