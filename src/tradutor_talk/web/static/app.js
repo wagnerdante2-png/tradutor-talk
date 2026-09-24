@@ -77,7 +77,9 @@ async function api(path, options = {}) {
   } catch (_) {}
 
   if (!response.ok) {
-    throw new Error(payload.detail || ("HTTP " + response.status));
+    const error = new Error(payload.detail || ("HTTP " + response.status));
+    error.status = response.status;
+    throw error;
   }
   return payload;
 }
@@ -110,15 +112,25 @@ async function refreshHealth() {
       setStatus("Pronto para tradução ao vivo", "Escolha a direção e clique em iniciar.", 0);
     }
     updateControls();
-  } catch (_) {
+  } catch (error) {
+    if (error.status === 401) {
+      labToken = "";
+      sessionStorage.removeItem("tradutorTalkLabToken");
+    }
     labAuthenticated = false;
     geminiConfigured = false;
-    backendBadge.textContent = "Token inválido";
+    backendBadge.textContent = error.status === 401 ? "Token inválido" : "Backend indisponível";
     backendBadge.className = "badge bad";
     labTokenPanel.classList.remove("hidden");
     geminiKeyPanel.classList.add("hidden");
     securityInfo.textContent = "API bloqueada";
-    setStatus("Token do laboratório inválido", "Copie novamente o token do Codespace.", 0);
+    setStatus(
+      error.status === 401 ? "Token do laboratório inválido" : "Falha ao consultar o laboratório",
+      error.status === 401
+        ? "O token salvo nesta aba foi apagado. Copie novamente o token do Codespace."
+        : error.message,
+      0
+    );
     updateControls();
   }
 }
