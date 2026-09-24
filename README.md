@@ -7,60 +7,35 @@ Tradutor Talk é um intérprete bidirecional de conversação em tempo real, ini
 A fundação M0 está concluída e o caminho técnico de M1–M5 está implementado para validação física no Windows.
 
 ~~~text
-áudio
-  ↓
-VAD local / segmentação
-  ↓
-STT
-  ↓
-tradução com contexto + glossário
-  ↓
-TTS
-  ↓
-WAV em memória
-  ↓
-saída selecionada
-~~~
-
-O projeto separa as duas rotas físicas:
-
-~~~text
 REMOTO -> entrada remota -> tradução -> saída local -> VOCÊ
 VOCÊ   -> entrada local  -> tradução -> saída remota -> INTERLOCUTOR
 ~~~
 
 ## Teste mais rápido no Windows
 
-Dê duplo clique em:
+O launcher principal é agora:
 
 ~~~text
-TESTAR_WINDOWS.bat
+TESTAR_WINDOWS.py
 ~~~
 
-Ele cria um ambiente virtual local, instala as dependências, roda os testes determinísticos e abre o assistente de teste real.
+Ele é Python puro e não depende de arquivos BAT.
 
-O assistente oferece:
+Tente nesta ordem:
 
-1. Modo mesa — mesmo microfone e mesmo fone nos dois sentidos, ideal para provar o motor rapidamente;
-2. Modo chamada roteada — microfone local, entrada remota, fone local e saída virtual remota independentes.
+1. duplo clique no TESTAR_WINDOWS.py, se arquivos .py estiverem associados ao Python;
+2. botão direito -> Abrir com -> Python;
+3. em um CMD normal aberto pelo usuário:
 
-A variável OPENAI_API_KEY pode ser informada temporariamente pelo assistente e não é salva pelo Tradutor Talk.
+~~~text
+py TESTAR_WINDOWS.py
+~~~
+
+O launcher valida Python 3.12+, cria uma .venv local usando a biblioteca padrão do Python, instala as dependências, executa os testes determinísticos e abre o assistente real.
+
+O launcher anterior em BAT foi retirado do caminho recomendado porque ambientes corporativos podem bloquear scripts batch antes de o aplicativo iniciar.
 
 Guia completo: docs/WINDOWS_TEST_GUIDE.md.
-
-## Princípios
-
-- estados explícitos e determinísticos;
-- nenhum áudio persistido por padrão;
-- providers substituíveis;
-- timeout e cancelamento centralizados;
-- contexto de conversa limitado;
-- testes com mocks/fakes antes de APIs reais;
-- métricas por etapa;
-- segredos fora do repositório;
-- VAD local sem consumo de API durante silêncio;
-- half-duplex permanece fechado até o playback terminar;
-- interface de produto somente depois de o núcleo estar estável.
 
 ## Marcos
 
@@ -77,48 +52,18 @@ Guia completo: docs/WINDOWS_TEST_GUIDE.md.
 - M10 — executável Windows.
 - M11+ — full-duplex, rota realtime direta e clientes futuros.
 
-## Instalação manual
+## Instalação manual sem BAT
 
 Requer Python 3.12+.
 
-~~~bash
-python -m venv .venv
-.venv\Scripts\activate
-pip install -e ".[dev,runtime]"
-pytest
+~~~text
+py -3 -m venv .venv
+.venv\Scripts\python.exe -m pip install -e ".[dev,runtime]"
+.venv\Scripts\python.exe -m pytest
+.venv\Scripts\python.exe -m tradutor_talk.app.windows_test
 ~~~
 
-## Comandos de teste
-
-Listar dispositivos:
-
-~~~bash
-python -m tradutor_talk.app.device_probe
-~~~
-
-Microfone -> STT:
-
-~~~bash
-python -m tradutor_talk.app.microphone_probe --seconds 3 --language pt-BR
-~~~
-
-Conversa bidirecional controlada:
-
-~~~bash
-python -m tradutor_talk.app.conversation_probe --seconds 4
-~~~
-
-Hands-free, uma rodada, dispositivos padrão:
-
-~~~bash
-python -m tradutor_talk.app.handsfree_probe --rounds 1
-~~~
-
-Assistente Windows:
-
-~~~bash
-python -m tradutor_talk.app.windows_test
-~~~
+Não é necessário executar activate.bat.
 
 ## Providers atuais
 
@@ -128,26 +73,20 @@ python -m tradutor_talk.app.windows_test
 - voz padrão: marin;
 - VAD: WebRTC local, agressividade 2.
 
-Todos são configuráveis em config/default.toml.
-
 ## Privacidade
 
 - áudio capturado fica em memória;
 - WAV sintetizado fica em memória;
 - conversa não é salva por padrão;
-- telemetria externa do aplicativo está desligada;
 - a chave da API não deve entrar no repositório.
 
 ## Documentação
 
 - docs/PROJECT_TECHNICAL_V1.md — âncora do projeto;
 - docs/ARCHITECTURE.md — decisões e fronteiras;
-- docs/STATES.md — máquina de estados;
-- docs/PROVIDERS.md — contratos de integração;
 - docs/TEST_PLAN.md — estratégia de validação;
-- docs/M1_AUDIO_STT.md — teste físico do primeiro caminho de áudio;
 - docs/M5_VAD_HANDSFREE.md — arquitetura do VAD/hands-free;
-- docs/WINDOWS_TEST_GUIDE.md — teste de mesa e chamada roteada;
+- docs/WINDOWS_TEST_GUIDE.md — teste Windows;
 - docs/REFERENCES.md — referências públicas estudadas.
 
 Nenhum workflow de GitHub Actions é necessário para desenvolver, testar ou executar o projeto.
