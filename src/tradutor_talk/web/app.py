@@ -110,6 +110,11 @@ async def set_session_key(payload: SessionKeyPayload, request: Request):
     _require_lab_token(request)
 
     key = payload.api_key.strip()
+    if hmac.compare_digest(key, LAB_TOKEN):
+        raise HTTPException(
+            status_code=400,
+            detail="Você colou o token do laboratório. Aqui deve entrar uma OPENAI_API_KEY real.",
+        )
     if len(key) < 20:
         raise HTTPException(status_code=400, detail="API key appears invalid")
 
