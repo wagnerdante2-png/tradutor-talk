@@ -1,0 +1,108 @@
+<!doctype html>
+<html lang="pt-BR">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <title>Tradutor Talk — Codespaces Lab</title>
+  <link rel="stylesheet" href="/static/styles.css">
+</head>
+<body>
+  <main class="shell">
+    <header class="hero">
+      <div>
+        <p class="eyebrow">CODESPACES LAB</p>
+        <h1>Tradutor Talk</h1>
+        <p class="sub">Teste bidirecional de voz sem instalar o runtime no notebook.</p>
+      </div>
+      <div id="backendBadge" class="badge">Conectando…</div>
+    </header>
+
+    <section id="keyPanel" class="panel hidden">
+      <div class="panel-head">
+        <div>
+          <p class="eyebrow">API</p>
+          <h2>Chave da sessão</h2>
+        </div>
+      </div>
+      <p class="muted">A chave fica somente na memória do processo do Codespace e não é gravada pelo Tradutor Talk.</p>
+      <div class="key-row">
+        <input id="apiKey" type="password" autocomplete="off" placeholder="sk-…">
+        <button id="saveKey" class="secondary">Usar nesta sessão</button>
+      </div>
+    </section>
+
+    <section class="panel language-panel">
+      <div class="language">
+        <span>Você</span>
+        <select id="localLanguage">
+          <option value="pt-BR" selected>Português (Brasil)</option>
+          <option value="en-US">English (US)</option>
+        </select>
+      </div>
+      <div class="swap">⇄</div>
+      <div class="language">
+        <span>Interlocutor</span>
+        <select id="remoteLanguage">
+          <option value="en-US" selected>English (US)</option>
+          <option value="pt-BR">Português (Brasil)</option>
+        </select>
+      </div>
+    </section>
+
+    <section class="turn-grid">
+      <article class="turn-card remote">
+        <p class="eyebrow">REMOTO → LOCAL</p>
+        <h2 id="remoteTitle">Interlocutor fala</h2>
+        <p>Grave a fala do interlocutor. O retorno traduzido tocará neste navegador.</p>
+        <button id="remoteButton" class="turn-button">Iniciar gravação</button>
+      </article>
+
+      <article class="turn-card local">
+        <p class="eyebrow">LOCAL → REMOTO</p>
+        <h2 id="localTitle">Você fala</h2>
+        <p>Grave sua fala. Neste laboratório, a tradução também toca neste navegador.</p>
+        <button id="localButton" class="turn-button">Iniciar gravação</button>
+      </article>
+    </section>
+
+    <section class="panel status-panel">
+      <div class="status-top">
+        <div>
+          <p class="eyebrow">SESSÃO</p>
+          <h2 id="statusText">Pronto para iniciar</h2>
+        </div>
+        <button id="resetButton" class="ghost">Resetar sessão</button>
+      </div>
+      <div class="progress"><div id="progressBar"></div></div>
+      <p id="statusDetail" class="muted">Permita o acesso ao microfone quando o Chrome solicitar.</p>
+    </section>
+
+    <section class="transcript-grid">
+      <article class="panel">
+        <p class="eyebrow">ORIGINAL</p>
+        <div id="originalText" class="transcript">—</div>
+      </article>
+      <article class="panel">
+        <p class="eyebrow">TRADUÇÃO</p>
+        <div id="translatedText" class="transcript accent">—</div>
+      </article>
+    </section>
+
+    <section class="panel">
+      <div class="metrics">
+        <div><span>STT</span><strong id="sttMetric">—</strong></div>
+        <div><span>Tradução</span><strong id="translationMetric">—</strong></div>
+        <div><span>TTS</span><strong id="ttsMetric">—</strong></div>
+        <div><span>Processamento</span><strong id="totalMetric">—</strong></div>
+      </div>
+      <audio id="translatedAudio" controls></audio>
+    </section>
+
+    <footer>
+      <span>Áudio capturado em memória no navegador e enviado ao Codespace somente ao encerrar o turno.</span>
+      <span id="contextInfo">Contexto: 0 turnos</span>
+    </footer>
+  </main>
+  <script src="/static/app.js" defer></script>
+</body>
+</html>
