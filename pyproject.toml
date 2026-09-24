@@ -4,7 +4,7 @@ build-backend = "setuptools.build_meta"
 
 [project]
 name = "tradutor-talk"
-version = "0.2.0"
+version = "0.3.0"
 description = "Intérprete bidirecional de conversação em tempo real."
 readme = "README.md"
 requires-python = ">=3.12"
@@ -15,6 +15,11 @@ dev = ["pytest>=8,<10"]
 audio = ["sounddevice>=0.5,<1"]
 vad = ["webrtcvad-wheels==2.0.14"]
 openai = ["openai>=3.17,<4"]
+web = [
+    "fastapi>=0.116,<1",
+    "uvicorn[standard]>=0.35,<1",
+    "openai>=3.17,<4",
+]
 runtime = [
     "sounddevice>=0.5,<1",
     "webrtcvad-wheels==2.0.14",
@@ -25,9 +30,13 @@ runtime = [
 tradutor-talk = "tradutor_talk.app.main:main"
 tradutor-talk-test = "tradutor_talk.app.windows_test:main"
 tradutor-talk-devices = "tradutor_talk.app.device_probe:main"
+tradutor-talk-web = "tradutor_talk.web.__main__:main"
 
 [tool.setuptools.packages.find]
 where = ["src"]
+
+[tool.setuptools.package-data]
+"tradutor_talk.web" = ["static/*.html", "static/*.css", "static/*.js"]
 
 [tool.pytest.ini_options]
 pythonpath = ["src"]
