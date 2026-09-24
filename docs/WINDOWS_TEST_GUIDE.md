@@ -1,33 +1,63 @@
-# Guia de teste Windows — caminho mais curto
+# Guia de teste Windows
 
-## Objetivo
+## Ambiente corporativo
 
-Validar o Tradutor Talk em hardware real antes de iniciar streaming/M6.
+O launcher principal não depende mais de BAT.
 
-O projeto oferece dois cenários.
+Políticas de Endpoint Security podem bloquear arquivos batch antes que o programa seja iniciado. O caminho recomendado agora usa TESTAR_WINDOWS.py, executado pelo próprio Python.
+
+Não desative antivírus, Endpoint Security ou políticas corporativas para testar o projeto.
+
+## Caminho recomendado
+
+Na raiz do projeto:
+
+~~~text
+TESTAR_WINDOWS.py
+~~~
+
+Tente nesta ordem:
+
+1. duplo clique, se .py estiver associado ao Python;
+2. botão direito -> Abrir com -> Python;
+3. abrir um CMD normal e executar:
+
+~~~text
+py TESTAR_WINDOWS.py
+~~~
+
+## O que o launcher faz
+
+1. verifica Python 3.12+;
+2. cria .venv usando o módulo padrão venv;
+3. usa diretamente .venv\Scripts\python.exe;
+4. instala .[dev,runtime];
+5. executa pytest;
+6. abre tradutor_talk.app.windows_test.
+
+Ele não executa activate.bat.
+
+Se a política corporativa bloquear o próprio Python, pip ou acesso de rede necessário para baixar pacotes, o launcher mostrará a etapa que falhou.
 
 ## Modo mesa
 
-Serve para validar rapidamente microfone, VAD, STT, tradução PT-BR ⇄ EN, TTS, reprodução e repetição de rodadas.
+Valida rapidamente microfone, VAD, STT, tradução PT-BR ⇄ EN, TTS, reprodução e repetição de rodadas.
 
-Os dois lados usam o mesmo microfone e a mesma saída. Duas pessoas podem falar alternadamente na mesma máquina.
+Os dois lados usam o mesmo microfone e a mesma saída.
 
 ## Modo chamada roteada
-
-Este é o cenário mais próximo do produto final.
 
 ~~~text
 INTERLOCUTOR / CHAMADA
         |
         v
-entrada de áudio remoto / virtual cable
+entrada de áudio remoto
         |
         v
 STT -> tradução -> TTS
         |
         v
 seu fone
-
 
 VOCÊ
         |
@@ -44,83 +74,23 @@ saída virtual
 microfone selecionado no app de chamada
 ~~~
 
-O software mantém quatro papéis independentes:
+O software mantém quatro papéis independentes: entrada local, entrada remota, saída local e saída remota.
 
-- entrada local;
-- entrada remota;
-- saída local;
-- saída remota.
-
-## Teste mais rápido
-
-No Windows, baixe ou clone o repositório e dê duplo clique em:
+## Preparação manual sem BAT
 
 ~~~text
-TESTAR_WINDOWS.bat
+py -3 -m venv .venv
+.venv\Scripts\python.exe -m pip install -e ".[dev,runtime]"
+.venv\Scripts\python.exe -m pytest
+.venv\Scripts\python.exe -m tradutor_talk.app.windows_test
 ~~~
-
-O script:
-
-1. verifica Python 3.12+;
-2. cria .venv dentro da pasta;
-3. instala as dependências do runtime;
-4. executa os testes determinísticos;
-5. abre o assistente interativo;
-6. pede a chave da API somente se ela não existir no ambiente;
-7. não salva a chave.
 
 ## Listar dispositivos
 
-~~~bash
-python -m tradutor_talk.app.device_probe
+~~~text
+.venv\Scripts\python.exe -m tradutor_talk.app.device_probe
 ~~~
-
-ou, após instalação:
-
-~~~bash
-tradutor-talk-devices
-~~~
-
-## Linha de comando
-
-Teste de mesa com dispositivos padrão:
-
-~~~bash
-python -m tradutor_talk.app.handsfree_probe --rounds 1
-~~~
-
-Exemplo de chamada roteada:
-
-~~~bash
-python -m tradutor_talk.app.handsfree_probe ^
-  --rounds 1 ^
-  --local-input-device 1 ^
-  --remote-input-device 6 ^
-  --local-output-device 4 ^
-  --remote-output-device 7
-~~~
-
-Os IDs são apenas exemplo. Use os IDs mostrados na sua máquina.
-
-## Dispositivo virtual
-
-Para uma chamada real, o Windows precisa expor uma rota que permita capturar o áudio do interlocutor como entrada e entregar a voz traduzida como um microfone que o aplicativo de chamada enxergue.
-
-O Tradutor Talk não instala nem altera drivers de áudio do sistema automaticamente.
 
 ## Gate antes de M6
 
-Durante o teste, observe:
-
-- se o início da frase foi cortado;
-- se o VAD encerrou cedo ou tarde;
-- STT ms;
-- tradução ms;
-- TTS ms;
-- playback ms;
-- total do turno;
-- dispositivo usado em cada papel;
-- eventual eco;
-- falha de API ou áudio.
-
-Com esses dados, M6 deve atacar a parcela real de latência em vez de otimizar por hipótese.
+Observe durante o teste: corte do início de frase, encerramento do VAD, STT ms, tradução ms, TTS ms, playback ms, total do turno, eco e falhas de API ou áudio.
