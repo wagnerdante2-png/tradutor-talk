@@ -1,0 +1,8 @@
+[session]
+provider_timeout_seconds = 10.0
+
+[context]
+max_turns = 8
+
+[glossary]
+path = "config/glossary.example.json"

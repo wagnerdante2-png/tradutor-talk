@@ -1,0 +1,8 @@
+{
+  "entries": [
+    {"term": "WMS", "translation": "WMS"},
+    {"term": "SKU", "translation": "SKU"},
+    {"term": "picking", "translation": "picking"},
+    {"term": "putaway", "translation": "putaway"}
+  ]
+}
