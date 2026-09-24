@@ -79,12 +79,34 @@ O Codespaces deve detectar a porta 8000 automaticamente.
 Na guia PORTS/PORTAS:
 
 - porta: 8000;
-- visibilidade: Private/Privada;
+- altere temporariamente a visibilidade para Public/Pública;
 - abra no navegador.
 
-Não é necessário tornar a porta pública.
+Motivo: neste notebook o proxy de autenticação da porta privada está retornando HTTP 401. O laboratório agora possui uma segunda camada própria de proteção: todas as rotas de API exigem um token aleatório de alta entropia gerado dentro do Codespace.
 
-## 4. API key
+A página HTML pode ser carregada publicamente, mas sem o token ninguém consegue configurar a OPENAI_API_KEY, enviar áudio, usar STT/TTS, resetar a sessão ou consumir sua cota.
+
+Ao terminar o teste, volte a porta para Private/Privada ou pare o Codespace.
+
+## 4. Token do laboratório
+
+No terminal do Codespace:
+
+~~~text
+cat /tmp/tradutor-talk-lab-token
+~~~
+
+Copie o valor exibido e cole no primeiro painel da página.
+
+O token também aparece no log de inicialização:
+
+~~~text
+cat /tmp/tradutor-talk-web.log
+~~~
+
+O navegador mantém o token apenas em sessionStorage da aba atual.
+
+## 5. API key
 
 Há duas formas.
 
@@ -100,7 +122,7 @@ Configure OPENAI_API_KEY no ambiente do Codespace antes de iniciar o servidor.
 
 Nesse caso o campo não aparece.
 
-## 5. Primeiro teste
+## 6. Primeiro teste
 
 Mantenha:
 
