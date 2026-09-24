@@ -1,3 +1,6 @@
+const labTokenPanel = document.getElementById("labTokenPanel");
+const labTokenInput = document.getElementById("labToken");
+const unlockLabButton = document.getElementById("unlockLab");
 const remoteButton = document.getElementById("remoteButton");
 const localButton = document.getElementById("localButton");
 const resetButton = document.getElementById("resetButton");
@@ -26,6 +29,9 @@ let activeDirection = null;
 let activeButton = null;
 let currentUtteranceId = null;
 let lastAudioUrl = null;
+let labToken = sessionStorage.getItem("tradutorTalkLabToken") || "";
+let labAuthenticated = false;
+let apiKeyConfigured = false;
 
 function setStatus(title, detail, progress) {
   statusText.textContent = title;
@@ -34,8 +40,10 @@ function setStatus(title, detail, progress) {
 }
 
 function setButtonsDisabled(disabled) {
-  remoteButton.disabled = disabled;
-  localButton.disabled = disabled;
+  const blocked = disabled || !labAuthenticated || !apiKeyConfigured;
+  remoteButton.disabled = blocked;
+  localButton.disabled = blocked;
+  resetButton.disabled = !labAuthenticated;
 }
 
 function formatMs(value) {
@@ -44,7 +52,10 @@ function formatMs(value) {
 }
 
 async function api(path, options) {
-  const response = await fetch(path, options || {});
+  const requestOptions = options ? {...options} : {};
+  requestOptions.headers = new Headers(requestOptions.headers || {});
+  if (labToken) requestOptions.headers.set("X-Tradutor-Token", labToken);
+  const response = await fetch(path, requestOptions);
   let payload = {};
   try {
     payload = await response.json();
@@ -58,18 +69,60 @@ async function api(path, options) {
 }
 
 async function refreshHealth() {
+  if (!labToken) {
+    labAuthenticated = false;
+    apiKeyConfigured = false;
+    labTokenPanel.classList.remove("hidden");
+    keyPanel.classList.add("hidden");
+    backendBadge.textContent = "Aguardando token";
+    backendBadge.className = "badge";
+    setButtonsDisabled(true);
+    return;
+  }
+
   try {
     const health = await api("/api/health");
+    labAuthenticated = true;
+    apiKeyConfigured = health.api_key_configured;
+    labTokenPanel.classList.add("hidden");
+    keyPanel.classList.toggle("hidden", apiKeyConfigured);
     backendBadge.textContent = "Codespace online · " + health.state;
     backendBadge.className = "badge ok";
-    keyPanel.classList.toggle("hidden", health.api_key_configured);
     contextInfo.textContent = "Contexto: " + health.context_turns + " turnos";
+    setButtonsDisabled(false);
+    if (!apiKeyConfigured) {
+      setStatus("Laboratório desbloqueado", "Informe a OPENAI_API_KEY para iniciar o teste.", 0);
+    }
   } catch (error) {
-    backendBadge.textContent = "Backend indisponível";
+    labAuthenticated = false;
+    apiKeyConfigured = false;
+    labTokenPanel.classList.remove("hidden");
+    keyPanel.classList.add("hidden");
+    backendBadge.textContent = "Token inválido";
     backendBadge.className = "badge bad";
-    setStatus("Backend indisponível", error.message, 0);
+    setButtonsDisabled(true);
+    setStatus("Token do laboratório inválido", "Copie novamente o token gerado no terminal do Codespace.", 0);
   }
 }
+
+unlockLabButton.addEventListener("click", async () => {
+  const value = labTokenInput.value.trim();
+  if (!value) return;
+  labToken = value;
+  sessionStorage.setItem("tradutorTalkLabToken", labToken);
+  labTokenInput.value = "";
+  await fetch("/api/public-health")
+  .then(response => {
+    if (!response.ok) throw new Error("backend unavailable");
+    return response.json();
+  })
+  .then(() => refreshHealth())
+  .catch(() => {
+    backendBadge.textContent = "Backend indisponível";
+    backendBadge.className = "badge bad";
+    setStatus("Backend indisponível", "O servidor do Codespace não respondeu.", 0);
+  });
+});
 
 saveKeyButton.addEventListener("click", async () => {
   const value = apiKeyInput.value.trim();
@@ -82,6 +135,7 @@ saveKeyButton.addEventListener("click", async () => {
       body: JSON.stringify({api_key: value})
     });
     apiKeyInput.value = "";
+    apiKeyConfigured = true;
     keyPanel.classList.add("hidden");
     setStatus("Chave carregada", "Ela existe somente na memória desta sessão do Codespace.", 0);
     await refreshHealth();
