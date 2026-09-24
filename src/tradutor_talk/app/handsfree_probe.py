@@ -49,14 +49,25 @@ async def _listen_and_translate(
         print(f"Original : {utterance.original_text}")
         print(f"Tradução : {utterance.translated_text}")
         print(
-            "Latência  : "
+            "Providers : "
             f"STT {utterance.stage_latency_ms.get('stt', 0):.0f} ms | "
             f"TR {utterance.stage_latency_ms.get('translation', 0):.0f} ms | "
-            f"TTS {utterance.stage_latency_ms.get('tts', 0):.0f} ms | "
-            f"total {utterance.total_latency_ms:.0f} ms"
+            f"TTS {utterance.stage_latency_ms.get('tts', 0):.0f} ms"
         )
 
-        await player.play_wav(result.speech.audio)
+        try:
+            controller.begin_playback(utterance)
+            await player.play_wav(result.speech.audio)
+            controller.finish_playback(utterance)
+        except Exception:
+            if controller.state in {SessionState.SYNTHESIZING, SessionState.PLAYING}:
+                controller.fail_playback(utterance)
+            raise
+
+        print(
+            f"Playback {utterance.stage_latency_ms.get('playback', 0):.0f} ms | "
+            f"turno total {utterance.total_latency_ms:.0f} ms"
+        )
 
     except Exception:
         if controller.state is SessionState.SESSION_ERROR:
