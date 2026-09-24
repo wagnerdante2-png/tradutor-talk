@@ -68,3 +68,7 @@ footer { display: flex; justify-content: space-between; gap: 20px; font-size: 12
   .language-panel { grid-template-columns: 1fr; }
   .swap { display: none; }
 }
+
+.danger-btn { background: #3a1b1f; color: #ffb7bd; border: 1px solid #6a2e36; }
+.live-meter { height: 8px; background: #151c26; border: 1px solid #263140; border-radius: 99px; overflow: hidden; }
+.live-meter div { height: 100%; width: 0; background: linear-gradient(90deg, #5cc8ff, #a98bff); transition: width .08s linear; }

@@ -1,146 +1,117 @@
 # Tradutor Talk
 
-Tradutor Talk é um intérprete bidirecional de conversação em tempo real, com núcleo Python substituível por providers e dois caminhos de I/O:
+Tradutor Talk é um intérprete bidirecional de voz com arquitetura desktop preservada e laboratório remoto via GitHub Codespaces.
+
+## Laboratório atual: Gemini Live Translate
+
+O caminho de teste no notebook corporativo agora usa diretamente:
 
 ~~~text
-DESKTOP FUTURO
-microfone/driver local -> núcleo -> saída local/virtual
-
-LABORATÓRIO CODESPACES
-microfone do Chrome -> HTTPS -> núcleo no Codespace -> HTTPS -> áudio no Chrome
+Chrome
+  -> microfone PCM 16 kHz
+  -> Gemini 3.5 Live Translate
+  -> áudio traduzido PCM 24 kHz
+  -> fone do navegador
 ~~~
 
-A arquitetura do produto não foi convertida em uma aplicação web. O modo Codespaces é um adaptador de teste temporário para executar o backend fora do notebook corporativo.
-
-## Teste recomendado no notebook corporativo
-
-Use GitHub Codespaces.
-
-Nada do runtime Python precisa ser instalado no notebook. O Chrome local fornece microfone e reprodução; Python, SDKs e chamadas de API rodam dentro do Codespace.
-
-### Passo 1 — criar o Codespace
-
-No GitHub, abra o repositório e use:
+O modelo usado é:
 
 ~~~text
-Code -> Codespaces -> Create codespace on main
+gemini-3.5-live-translate-preview
 ~~~
 
-O arquivo .devcontainer/devcontainer.json prepara Python 3.12 e instala automaticamente:
+Ele é específico para tradução speech-to-speech em tempo real. A direção é definida somente pelo idioma-alvo:
 
 ~~~text
-.[dev,web]
+Interlocutor fala -> idioma alvo = seu idioma
+Você fala         -> idioma alvo = idioma do interlocutor
 ~~~
 
-Somente dentro do Codespace.
+O idioma de origem é detectado pelo modelo.
 
-### Passo 2 — iniciar o laboratório
+## Por que Gemini no laboratório
 
-No terminal do Codespace:
+A API Gemini possui nível gratuito para modelos compatíveis, incluindo o Live Translate dentro dos limites do free tier. O Ultimecia Code já usa Gemini por chave local e HTTP direto; o Tradutor Talk mantém a mesma filosofia de chave no backend, sem expô-la ao frontend.
+
+A chave principal nunca é enviada ao navegador. O fluxo é:
 
 ~~~text
-python -m tradutor_talk.web
+GEMINI_API_KEY
+    fica no Codespace
+        |
+        v
+backend pede token efêmero restrito
+        |
+        v
+navegador recebe token de uso curto
+        |
+        v
+WebSocket direto Chrome <-> Gemini Live
 ~~~
 
-ou:
+Isso evita o proxy de áudio pelo Codespace e reduz latência.
 
-~~~text
-tradutor-talk-web
-~~~
+## Teste via Codespaces
 
-O servidor escuta na porta 8000. O Codespaces deve detectar a porta e encaminhá-la ao navegador.
-
-Em ambientes onde a autenticação da porta privada do Codespaces retorna HTTP 401, use temporariamente a porta como Pública. O laboratório protege todas as rotas de API com um token aleatório gerado dentro do Codespace; sem esse token não é possível configurar chave, enviar áudio ou consumir STT/TTS. Ao terminar, volte a porta para Privada ou pare o Codespace.
-
-### Passo 3 — token e microfone
-
-Se estiver usando a porta Pública por causa do HTTP 401, obtenha primeiro o token do laboratório no terminal:
+1. Atualize/crie um Codespace no branch main.
+2. A porta 8000 inicia automaticamente.
+3. Se a porta Private retornar HTTP 401 neste notebook, mude temporariamente para Public.
+4. Obtenha o token do laboratório:
 
 ~~~text
 cat /tmp/tradutor-talk-lab-token
 ~~~
 
-Cole-o no primeiro painel da página.
+5. Cole o token na página.
+6. Informe uma GEMINI_API_KEY.
+7. Se você já possui a chave usada no Ultimecia, pode reutilizá-la desde que ela continue válida.
+8. Caso a chave antiga seja rejeitada, gere/migre uma chave de autenticação atual no Google AI Studio.
+9. Escolha os idiomas e inicie uma das direções.
 
-Depois, na página Tradutor Talk:
+Ao terminar, volte a porta para Private ou pare o Codespace.
 
-1. permita o microfone quando o Chrome solicitar;
-2. se a OPENAI_API_KEY não estiver configurada no Codespace, cole a chave no painel da página;
-3. a chave fica somente na memória do processo do laboratório;
-4. grave primeiro um turno do interlocutor;
-5. pare a gravação para enviar o WAV ao Codespace;
-6. aguarde STT -> tradução -> TTS;
-7. escute a tradução;
-8. faça o turno inverso.
+## Streaming
 
-A interface mostra texto original, tradução e latência de STT, tradução, TTS e processamento total.
+O navegador envia áudio PCM mono 16-bit a 16 kHz em blocos próximos de 100 ms.
 
-## O que o laboratório valida
+O Gemini retorna áudio PCM mono 16-bit a 24 kHz em streaming. O navegador agenda os blocos de saída para reprodução contínua.
 
-- captura real do microfone pelo Chrome;
-- transporte browser -> Codespace;
-- STT real;
-- tradução PT-BR ⇄ EN;
-- contexto entre turnos;
-- TTS real;
-- transporte Codespace -> browser;
-- reprodução real no notebook;
-- lifecycle half-duplex até o final do playback;
-- latência de cada provider.
+A interface também mostra:
 
-O primeiro laboratório usa início/fim de gravação manual. Isso é deliberado: VAD/hands-free no navegador só entra depois de validar o ciclo ponta a ponta.
+- transcrição da fala original;
+- transcrição traduzida;
+- tempo de abertura da conexão;
+- tempo até o primeiro áudio traduzido;
+- direção ativa.
 
-## Rotas do produto preservadas
+## Arquitetura desktop preservada
 
-O desktop continua preparado para:
+Nada disso elimina o caminho desktop futuro:
 
 ~~~text
-REMOTO -> entrada remota -> tradução -> saída local -> VOCÊ
-VOCÊ   -> entrada local  -> tradução -> saída remota -> INTERLOCUTOR
+REMOTO -> entrada remota -> engine -> saída local -> VOCÊ
+VOCÊ   -> entrada local  -> engine -> saída remota -> INTERLOCUTOR
 ~~~
 
-O modo Codespaces não substitui drivers/dispositivos virtuais necessários futuramente para injetar áudio traduzido diretamente em Teams, Meet, WhatsApp ou Discord.
+O Codespaces Lab é um adaptador temporário de teste. O desktop continuará sendo importante para integração com dispositivos virtuais de áudio e chamadas externas.
 
-## Providers atuais
+## Segurança
 
-- STT: gpt-transcribe;
-- tradução: gpt-5.6-luna, reasoning none;
-- TTS: gpt-4o-mini-tts;
-- voz padrão: marin.
+Existem três camadas separadas:
 
-## Marcos
+~~~text
+porta Codespaces
+  -> token aleatório do laboratório
+      -> GEMINI_API_KEY somente no backend
+          -> token efêmero Gemini no navegador
+~~~
 
-- ✅ M0 — fundação, estados, mocks e resiliência.
-- 🟡 M1–M5 — núcleo desktop implementado; validação física local ainda pendente.
-- 🧪 Codespaces Lab — browser ⇄ backend remoto pronto para teste real sem instalação local.
-- ⏸ M6 — streaming/otimização após medir o laboratório.
-- M7 — ES / JA / ZH e autodetecção.
-- M8 — contexto e glossário avançado.
-- M9 — recuperação e carga.
-- M10 — executável Windows.
-- M11+ — full-duplex e rota realtime direta.
+A página pública não recebe sua GEMINI_API_KEY.
 
-## Privacidade do laboratório
+## OpenAI
 
-- a gravação é mantida em memória no navegador;
-- ao encerrar um turno, um WAV é enviado ao backend do Codespace;
-- o backend lê o corpo da requisição em memória;
-- o Tradutor Talk não salva o áudio por padrão;
-- a chave da API não é colocada no código;
-- a porta encaminhada deve permanecer privada.
+O core OpenAI desenvolvido anteriormente permanece no repositório como provider alternativo/futuro. Ele não é necessário para o laboratório web atual e ChatGPT Plus não é usado como credencial de API.
 
-## Windows local
+## Sem Actions
 
-TESTAR_WINDOWS.py continua disponível para futuro teste em equipamento próprio. Ele não é o caminho recomendado no notebook corporativo atual.
-
-## Documentação
-
-- docs/CODESPACES_TEST_GUIDE.md — laboratório remoto;
-- docs/PROJECT_TECHNICAL_V1.md — âncora;
-- docs/ARCHITECTURE.md — arquitetura;
-- docs/TEST_PLAN.md — testes;
-- docs/M5_VAD_HANDSFREE.md — VAD/hands-free desktop;
-- docs/WINDOWS_TEST_GUIDE.md — execução Windows local;
-- docs/REFERENCES.md — projetos públicos estudados.
-
-Nenhum workflow de GitHub Actions é necessário.
+Nenhum workflow de GitHub Actions é necessário para desenvolver ou executar o laboratório.
