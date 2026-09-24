@@ -31,9 +31,31 @@ class AudioConfig:
         if self.sample_rate < 8000:
             raise ValueError("sample_rate must be >= 8000")
         if self.channels != 1:
-            raise ValueError("M1 supports mono capture only")
-        if self.block_ms <= 0:
-            raise ValueError("block_ms must be > 0")
+            raise ValueError("current capture path supports mono only")
+        if self.block_ms not in {10, 20, 30}:
+            raise ValueError("block_ms must be 10, 20 or 30 for WebRTC VAD")
+
+
+@dataclass(slots=True, frozen=True)
+class VADConfig:
+    aggressiveness: int = 2
+    pre_roll_ms: int = 200
+    start_speech_ms: int = 60
+    end_silence_ms: int = 600
+    wait_timeout_seconds: float = 30.0
+    max_utterance_seconds: float = 20.0
+
+    def __post_init__(self) -> None:
+        if self.aggressiveness not in {0, 1, 2, 3}:
+            raise ValueError("VAD aggressiveness must be between 0 and 3")
+        if self.pre_roll_ms < 0:
+            raise ValueError("pre_roll_ms must be >= 0")
+        if self.start_speech_ms <= 0 or self.end_silence_ms <= 0:
+            raise ValueError("speech boundary durations must be > 0")
+        if self.wait_timeout_seconds <= 0:
+            raise ValueError("wait_timeout_seconds must be > 0")
+        if self.max_utterance_seconds <= 0:
+            raise ValueError("max_utterance_seconds must be > 0")
 
 
 @dataclass(slots=True, frozen=True)
@@ -51,6 +73,7 @@ class AppConfig:
     context: ContextConfig = ContextConfig()
     glossary: GlossaryConfig = GlossaryConfig()
     audio: AudioConfig = AudioConfig()
+    vad: VADConfig = VADConfig()
     openai: OpenAIProviderConfig = OpenAIProviderConfig()
 
 
@@ -66,5 +89,6 @@ def load_config(path: str | Path) -> AppConfig:
         context=ContextConfig(**raw.get("context", {})),
         glossary=GlossaryConfig(**raw.get("glossary", {})),
         audio=AudioConfig(**raw.get("audio", {})),
+        vad=VADConfig(**raw.get("vad", {})),
         openai=OpenAIProviderConfig(**providers.get("openai", {})),
     )
