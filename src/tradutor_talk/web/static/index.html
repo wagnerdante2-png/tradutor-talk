@@ -3,45 +3,37 @@
 <head>
   <meta charset="utf-8">
   <meta name="viewport" content="width=device-width, initial-scale=1">
-  <title>Tradutor Talk — Codespaces Lab</title>
+  <title>Tradutor Talk — Gemini Live Lab</title>
   <link rel="stylesheet" href="/static/styles.css">
 </head>
 <body>
   <main class="shell">
     <header class="hero">
       <div>
-        <p class="eyebrow">CODESPACES LAB</p>
+        <p class="eyebrow">GEMINI LIVE · CODESPACES LAB</p>
         <h1>Tradutor Talk</h1>
-        <p class="sub">Teste bidirecional de voz sem instalar o runtime no notebook.</p>
+        <p class="sub">Tradução voz→voz em tempo real, sem instalar o runtime no notebook.</p>
       </div>
       <div id="backendBadge" class="badge">Conectando…</div>
     </header>
 
     <section id="labTokenPanel" class="panel">
-      <div class="panel-head">
-        <div>
-          <p class="eyebrow">ACESSO AO LABORATÓRIO</p>
-          <h2>Token do Codespace</h2>
-        </div>
-      </div>
-      <p class="muted">Copie o token gerado dentro do Codespace. Ele protege todas as rotas de API mesmo quando a porta 8000 está pública.</p>
+      <p class="eyebrow">ACESSO AO LABORATÓRIO</p>
+      <h2>Token do Codespace</h2>
+      <p class="muted">Protege o backend do laboratório enquanto a porta 8000 está pública.</p>
       <div class="key-row">
         <input id="labToken" type="password" autocomplete="off" placeholder="Token do laboratório">
-        <button id="unlockLab" class="secondary">Desbloquear laboratório</button>
+        <button id="unlockLab" class="secondary">Desbloquear</button>
       </div>
     </section>
 
-    <section id="keyPanel" class="panel hidden">
-      <div class="panel-head">
-        <div>
-          <p class="eyebrow">OPENAI API</p>
-          <h2>Chave da sessão</h2>
-        </div>
-      </div>
-      <p class="muted"><strong>Esta chave é diferente do token do laboratório.</strong> Use uma OPENAI_API_KEY real da plataforma da OpenAI. Ela fica somente na memória do processo do Codespace e não é gravada pelo Tradutor Talk.</p>
+    <section id="geminiKeyPanel" class="panel hidden">
+      <p class="eyebrow">GOOGLE AI</p>
+      <h2>Gemini API key</h2>
+      <p class="muted"><strong>É diferente do token do laboratório.</strong> Use a mesma GEMINI_API_KEY do Ultimecia ou crie uma chave gratuita no Google AI Studio. A chave fica somente na memória do Codespace e nunca vai para o navegador.</p>
       <div class="key-row">
-        <input id="apiKey" type="password" autocomplete="off" placeholder="sk-…">
-        <button id="saveKey" class="secondary">Usar nesta sessão</button>
+        <input id="geminiKey" type="password" autocomplete="off" placeholder="Gemini API key">
+        <button id="saveGeminiKey" class="secondary">Usar nesta sessão</button>
       </div>
     </section>
 
@@ -51,6 +43,9 @@
         <select id="localLanguage">
           <option value="pt-BR" selected>Português (Brasil)</option>
           <option value="en-US">English (US)</option>
+          <option value="es-ES">Español</option>
+          <option value="ja-JP">日本語</option>
+          <option value="zh-CN">中文</option>
         </select>
       </div>
       <div class="swap">⇄</div>
@@ -59,6 +54,9 @@
         <select id="remoteLanguage">
           <option value="en-US" selected>English (US)</option>
           <option value="pt-BR">Português (Brasil)</option>
+          <option value="es-ES">Español</option>
+          <option value="ja-JP">日本語</option>
+          <option value="zh-CN">中文</option>
         </select>
       </div>
     </section>
@@ -67,54 +65,54 @@
       <article class="turn-card remote">
         <p class="eyebrow">REMOTO → LOCAL</p>
         <h2>Interlocutor fala</h2>
-        <p>Grave a fala do interlocutor. O retorno traduzido tocará neste navegador.</p>
-        <button id="remoteButton" class="turn-button" disabled>Iniciar gravação</button>
+        <p>O Gemini detecta o idioma falado e transmite a tradução para o seu idioma enquanto a pessoa fala.</p>
+        <button id="remoteButton" class="turn-button" disabled>Iniciar tradução ao vivo</button>
       </article>
 
       <article class="turn-card local">
         <p class="eyebrow">LOCAL → REMOTO</p>
         <h2>Você fala</h2>
-        <p>Grave sua fala. Neste laboratório, a tradução também toca neste navegador.</p>
-        <button id="localButton" class="turn-button" disabled>Iniciar gravação</button>
+        <p>Sua voz é transmitida em tempo real e a saída traduzida usa o idioma configurado para o interlocutor.</p>
+        <button id="localButton" class="turn-button" disabled>Iniciar tradução ao vivo</button>
       </article>
     </section>
 
     <section class="panel status-panel">
       <div class="status-top">
         <div>
-          <p class="eyebrow">SESSÃO</p>
+          <p class="eyebrow">SESSÃO LIVE</p>
           <h2 id="statusText">Informe o token do laboratório</h2>
         </div>
-        <button id="resetButton" class="ghost" disabled>Resetar sessão</button>
+        <button id="stopButton" class="danger-btn" disabled>Parar sessão</button>
       </div>
       <div class="progress"><div id="progressBar"></div></div>
-      <p id="statusDetail" class="muted">O token fica apenas nesta aba do navegador.</p>
+      <p id="statusDetail" class="muted">O áudio será enviado diretamente do Chrome ao Gemini usando um token efêmero.</p>
     </section>
 
     <section class="transcript-grid">
       <article class="panel">
-        <p class="eyebrow">ORIGINAL</p>
+        <p class="eyebrow">FALA ORIGINAL</p>
         <div id="originalText" class="transcript">—</div>
       </article>
       <article class="panel">
-        <p class="eyebrow">TRADUÇÃO</p>
+        <p class="eyebrow">TRADUÇÃO AO VIVO</p>
         <div id="translatedText" class="transcript accent">—</div>
       </article>
     </section>
 
     <section class="panel">
       <div class="metrics">
-        <div><span>STT</span><strong id="sttMetric">—</strong></div>
-        <div><span>Tradução</span><strong id="translationMetric">—</strong></div>
-        <div><span>TTS</span><strong id="ttsMetric">—</strong></div>
-        <div><span>Processamento</span><strong id="totalMetric">—</strong></div>
+        <div><span>Conexão</span><strong id="connectionMetric">—</strong></div>
+        <div><span>1º áudio</span><strong id="firstAudioMetric">—</strong></div>
+        <div><span>Direção</span><strong id="directionMetric">—</strong></div>
+        <div><span>Modelo</span><strong id="modelMetric">Gemini Live</strong></div>
       </div>
-      <audio id="translatedAudio" controls></audio>
+      <div class="live-meter"><div id="liveMeterBar"></div></div>
     </section>
 
     <footer>
-      <span>Áudio em memória no navegador; API protegida por token do laboratório.</span>
-      <span id="contextInfo">Contexto: 0 turnos</span>
+      <span>Chave Gemini no Codespace · token efêmero no navegador · áudio direto para o Gemini Live.</span>
+      <span id="securityInfo">API bloqueada</span>
     </footer>
   </main>
   <script src="/static/app.js" defer></script>
